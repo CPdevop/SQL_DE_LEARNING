@@ -11803,3 +11803,636 @@ After completing Chapter 33, you should be able to
 ☑ Solve senior-level interview questions.
 
 ☑ Design enterprise architectures using CASE.
+
+
+# ==========================================================
+# Section 17
+# Chapter Summary, Knowledge Graph & Learning Roadmap
+# ==========================================================
+
+# Chapter Recap
+
+Congratulations!
+
+You have completed one of the most comprehensive chapters in this handbook.
+
+This chapter was never intended to simply teach the syntax of the `CASE` expression.
+
+Instead, the objective was to help you understand how CASE expressions are designed, optimized, maintained, and used in modern enterprise data platforms.
+
+You have progressed from writing basic conditional expressions to making architectural decisions that influence ETL pipelines, data warehouses, reporting systems, and enterprise applications.
+
+By completing this chapter, you have acquired both SQL knowledge and Data Engineering design principles.
+
+---
+
+# Knowledge Graph
+
+The following diagram summarizes everything learned throughout this chapter.
+
+```
+                                  CASE Expression
+
+                                         │
+
+      ┌──────────────────────────────────┼──────────────────────────────────┐
+
+      │                                  │                                  │
+
+      ▼                                  ▼                                  ▼
+
+Basic Syntax                     Advanced CASE                     Conditional Logic
+
+      │                                  │                                  │
+
+      ▼                                  ▼                                  ▼
+
+Simple CASE                    Nested CASE                    Multiple Conditions
+
+      │                                  │
+
+      └──────────────┬───────────────────┘
+
+                     ▼
+
+             Query Execution
+
+                     │
+
+      ┌──────────────┼──────────────┐
+
+      ▼                              ▼
+
+Logical Plan                 Physical Plan
+
+      │                              │
+
+      ▼                              ▼
+
+Optimizer                 Execution Engine
+
+                     │
+
+                     ▼
+
+             Performance Tuning
+
+                     │
+
+      ┌──────────────┼──────────────┐
+
+      ▼                              ▼
+
+Expensive Functions          Predicate Design
+
+      │                              │
+
+      └──────────────┬───────────────┘
+
+                     ▼
+
+            Enterprise Design
+
+                     │
+
+      ┌──────────────┼───────────────┐
+
+      ▼                              ▼
+
+Lookup Tables              Dimension Tables
+
+                     │
+
+                     ▼
+
+               ETL Pipelines
+
+                     │
+
+                     ▼
+
+             Data Warehouse
+
+                     │
+
+                     ▼
+
+          Business Intelligence
+
+                     │
+
+                     ▼
+
+             Enterprise Reporting
+```
+
+---
+
+# CASE Decision Framework
+
+Whenever you need conditional logic, ask yourself the following questions.
+
+```
+Do I need to calculate something?
+
+        │
+
+      YES
+
+        │
+
+        ▼
+
+     Use CASE
+
+        │
+
+        ▼
+
+Does the logic change frequently?
+
+        │
+
+   YES         NO
+
+    │           │
+
+    ▼           ▼
+
+Configuration   CASE
+
+Table
+
+```
+
+---
+
+If the requirement is a mapping instead of a calculation,
+
+```
+Need to map codes?
+
+        │
+
+       YES
+
+        │
+
+        ▼
+
+Lookup Table
+
+        │
+
+        ▼
+
+Need additional business attributes?
+
+        │
+
+       YES
+
+        │
+
+        ▼
+
+Dimension Table
+```
+
+---
+
+# Enterprise Decision Matrix
+
+| Business Requirement | Recommended Solution |
+|----------------------|----------------------|
+| Salary Band | CASE |
+| Customer Tier | CASE (ETL) |
+| Product Category | Dimension Table |
+| Country Code | Lookup Table |
+| Tax Rate | Configuration Table |
+| Discount Percentage | Configuration Table |
+| Customer Segment | CASE or Dimension |
+| Risk Classification | CASE |
+| ISO Country Mapping | Lookup Table |
+| Business Metadata | Dimension Table |
+
+---
+
+# Common Production Uses of CASE
+
+CASE expressions appear in almost every enterprise data platform.
+
+Examples include:
+
+### Banking
+
+- Loan Classification
+- Fraud Detection
+- AML Risk
+- Credit Scoring
+
+---
+
+### Healthcare
+
+- Patient Priority
+- Insurance Category
+- Risk Assessment
+- Billing Classification
+
+---
+
+### Retail
+
+- Customer Tier
+- Product Category
+- Discount Band
+- Sales Category
+
+---
+
+### Telecommunications
+
+- Subscriber Type
+- Recharge Category
+- Network Status
+- Customer Segment
+
+---
+
+### Insurance
+
+- Claim Priority
+- Policy Classification
+- Risk Level
+- Premium Band
+
+---
+
+### Manufacturing
+
+- Machine Health
+- Defect Category
+- Production Status
+- Inventory Classification
+
+---
+
+# Skills Acquired
+
+After completing this chapter, you can now:
+
+## SQL Skills
+
+✓ Write Simple CASE
+
+✓ Write Searched CASE
+
+✓ Use CASE inside SELECT
+
+✓ Use CASE inside ORDER BY
+
+✓ Use CASE inside GROUP BY
+
+✓ Use CASE inside HAVING
+
+✓ Use CASE inside UPDATE
+
+✓ Use CASE inside INSERT
+
+✓ Use CASE inside Aggregate Functions
+
+✓ Use CASE inside Window Functions
+
+---
+
+## Data Engineering Skills
+
+✓ Design ETL transformations
+
+✓ Build reusable business rules
+
+✓ Classify transactional data
+
+✓ Build reporting datasets
+
+✓ Create derived business attributes
+
+✓ Improve SQL maintainability
+
+✓ Review SQL professionally
+
+✓ Read execution plans conceptually
+
+✓ Understand optimizer behavior
+
+✓ Build scalable transformation logic
+
+---
+
+## Architecture Skills
+
+✓ Decide between CASE and Lookup Tables
+
+✓ Decide between CASE and Dimension Tables
+
+✓ Materialize business attributes
+
+✓ Centralize business logic
+
+✓ Design reusable SQL
+
+✓ Build warehouse-friendly transformations
+
+---
+
+# Common Mistakes to Remember
+
+Never forget these lessons.
+
+❌ Wrong condition ordering
+
+❌ Missing ELSE
+
+❌ Overlapping conditions
+
+❌ Hardcoded business mappings
+
+❌ Huge CASE expressions
+
+❌ Duplicate CASE logic
+
+❌ Expensive functions inside CASE
+
+❌ Mixing business domains
+
+❌ Ignoring maintainability
+
+❌ Ignoring execution plans
+
+---
+
+# Best Practices
+
+Always remember these principles.
+
+✅ Keep CASE expressions readable.
+
+✅ Make conditions mutually exclusive whenever possible.
+
+✅ Add ELSE unless NULL is intentional.
+
+✅ Use descriptive aliases.
+
+✅ Replace large mappings with lookup tables.
+
+✅ Replace business entities with dimensions.
+
+✅ Store stable business rules during ETL.
+
+✅ Review SQL before deployment.
+
+✅ Test boundary conditions.
+
+✅ Document business assumptions.
+
+---
+
+# Self-Assessment Checklist
+
+Can you confidently answer the following?
+
+| Question | Completed |
+|-----------|-----------|
+| Can you explain CASE? | ☐ |
+| Can you explain Simple vs Searched CASE? | ☐ |
+| Can you explain evaluation order? | ☐ |
+| Can you explain optimizer behavior? | ☐ |
+| Can you optimize CASE? | ☐ |
+| Can you review CASE professionally? | ☐ |
+| Can you design lookup tables? | ☐ |
+| Can you design dimensions? | ☐ |
+| Can you build ETL transformations? | ☐ |
+| Can you answer senior interview questions? | ☐ |
+
+If any answer is "No",
+
+revisit the corresponding section before moving forward.
+
+---
+
+# Recommended Practice
+
+Before starting the next chapter, complete the following.
+
+## Practice 1
+
+Rewrite every CASE example without looking at the solution.
+
+---
+
+## Practice 2
+
+Replace three CASE expressions with lookup tables.
+
+---
+
+## Practice 3
+
+Convert one lookup table into a dimension table.
+
+---
+
+## Practice 4
+
+Create your own business classification problem and solve it.
+
+---
+
+## Practice 5
+
+Explain CASE to another person without referring to your notes.
+
+Teaching is one of the fastest ways to identify knowledge gaps.
+
+---
+
+# Recommended Reading Order
+
+Continue your SQL journey in the following sequence.
+
+```
+CASE
+
+↓
+
+NULL Handling
+
+↓
+
+Functions
+
+↓
+
+GROUP BY
+
+↓
+
+HAVING
+
+↓
+
+Joins
+
+↓
+
+Set Operators
+
+↓
+
+Subqueries
+
+↓
+
+CTEs
+
+↓
+
+Window Functions
+
+↓
+
+Query Optimization
+
+↓
+
+Transactions
+
+↓
+
+Indexes
+
+↓
+
+Data Warehousing
+
+↓
+
+Spark SQL
+
+↓
+
+Snowflake SQL
+```
+
+Each chapter builds on concepts learned previously.
+
+---
+
+# Key Takeaways
+
+Remember these five principles.
+
+### 1.
+
+CASE is an **expression**, not a statement.
+
+---
+
+### 2.
+
+CASE returns the first matching result.
+
+Order matters.
+
+---
+
+### 3.
+
+CASE is ideal for calculations,
+
+not large business mappings.
+
+---
+
+### 4.
+
+Business rules should have a single source of truth.
+
+Avoid duplicating CASE expressions across ETL jobs, reports, and dashboards.
+
+---
+
+### 5.
+
+A Senior Data Engineer thinks beyond syntax.
+
+They design SQL that is:
+
+- Correct
+- Readable
+- Maintainable
+- Performant
+- Scalable
+
+---
+
+# Looking Ahead
+
+The next chapter explores one of the most misunderstood topics in SQL.
+
+# Chapter 34
+# NULL Handling
+
+You will learn
+
+- What NULL actually represents
+- Three-Valued Logic
+- Why `NULL = NULL` is not TRUE
+- IS NULL
+- IS NOT NULL
+- COALESCE
+- NULLIF
+- IS DISTINCT FROM
+- NULLs in JOINs
+- NULLs in Aggregate Functions
+- NULLs in Window Functions
+- ETL Null Strategies
+- Data Warehouse Null Design
+- Query Optimization with NULLs
+- Enterprise Case Studies
+- PostgreSQL Lab
+- Interview Questions
+- Capstone Project
+
+Understanding NULL is essential because it affects almost every SQL query you will write.
+
+---
+
+# Final Thoughts
+
+Learning SQL is not about memorizing syntax.
+
+It is about learning how data behaves.
+
+As you progress through this handbook, continue asking not only:
+
+> **"How do I write this query?"**
+
+but also
+
+> **"How would this design behave in a production data platform handling billions of rows?"**
+
+That mindset is what transforms a SQL developer into a Data Engineer.
+
+---
+
+# End of Chapter 33
+
+**Congratulations!**
+
+You have completed one of the most comprehensive CASE expression chapters designed specifically for Data Engineers.
+
+The next chapter begins with one of SQL's most important concepts:
+
+**Chapter 34 — NULL Handling**
