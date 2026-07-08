@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>License - SQL & Python Curriculum</title>
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  
+  <!-- KaTeX Math CSS -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+  
+  <!-- Prism.js Dark/Light CSS -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" id="prism-theme">
+  
+  <!-- Shared Style Sheet -->
+  <link rel="stylesheet" href="style.css">
+  
+  <script>
+    // Immediate script to prevent theme flash
+    (function() {
+      const theme = localStorage.getItem('theme') || 'dark';
+      document.documentElement.setAttribute('data-theme', theme);
+    })();
+  </script>
+</head>
+<body>
+  
+  <header class="site-header">
+    <div class="header-container">
+      <a href="index.html" class="back-link">← Back to Curriculum Directory</a>
+      <div class="header-actions">
+        <button class="theme-toggle-btn" id="theme-btn">🌙 Dark Mode</button>
+      </div>
+    </div>
+  </header>
+  
+  <main class="content-wrapper">
+    <article class="markdown-body">
+      
+    </article>
+    
+    
+    
+  </main>
+
+  <!-- KaTeX & Prism Scripts -->
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js" onload="initKaTeX()"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-core.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+  <script>
+    const pageId = 'license';
+    let currentTheme = localStorage.getItem('theme') || 'dark';
+    
+    // Auto KaTeX setup
+    function initKaTeX() {
+      if (window.renderMathInElement) {
+        window.renderMathInElement(document.body, {
+          delimiters: [
+            {left: '$$', right: '$$', display: true},
+            {left: '\(', right: '\)', display: false},
+            {left: '$', right: '$', display: false}
+          ],
+          throwOnError : false
+        });
+      }
+    }
+
+    // Set Theme Toggler Content
+    const themeBtn = document.getElementById('theme-btn');
+    function updateThemeUI() {
+      themeBtn.innerHTML = currentTheme === 'dark' ? '🌙 Dark Mode' : '☀️ Light Mode';
+      const prismStyle = document.getElementById('prism-theme');
+      if (prismStyle) {
+        if (currentTheme === 'light') {
+          prismStyle.href = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css';
+        } else {
+          prismStyle.href = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css';
+        }
+      }
+    }
+    
+    themeBtn.addEventListener('click', () => {
+      currentTheme = currentTheme === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', currentTheme);
+      localStorage.setItem('theme', currentTheme);
+      updateThemeUI();
+    });
+    
+    updateThemeUI(); // Run immediately on load
+
+    // Copy action for code listings
+    function setupCodeBlocks() {
+      const codeBlocks = document.querySelectorAll('pre');
+      codeBlocks.forEach(block => {
+        const btn = document.createElement('button');
+        btn.className = 'copy-btn';
+        btn.innerText = 'Copy';
+        btn.onclick = () => {
+          const code = block.querySelector('code').innerText;
+          navigator.clipboard.writeText(code).then(() => {
+            btn.innerText = 'Copied!';
+            setTimeout(() => { btn.innerText = 'Copy'; }, 2000);
+          });
+        };
+        block.appendChild(btn);
+      });
+    }
+    setupCodeBlocks();
+
+    // Completion Status handling
+    function updateCompletionUI() {
+      const compBtn = document.getElementById('subpage-complete-btn');
+      if (!compBtn) return;
+      
+      const completed = JSON.parse(localStorage.getItem('completed_python_chapters') || '[]');
+      const isDone = completed.includes(pageId);
+      
+      const iconSpan = document.getElementById('complete-status-icon');
+      const textSpan = document.getElementById('complete-status-text');
+      
+      if (isDone) {
+        compBtn.style.backgroundColor = 'rgba(16, 185, 129, 0.15)';
+        compBtn.style.borderColor = '#10b981';
+        compBtn.style.color = '#10b981';
+        iconSpan.innerText = '✅';
+        textSpan.innerText = 'Completed';
+      } else {
+        compBtn.style.backgroundColor = 'var(--bg-primary)';
+        compBtn.style.borderColor = 'var(--border-color)';
+        compBtn.style.color = 'var(--text-primary)';
+        iconSpan.innerText = '⏳';
+        textSpan.innerText = 'Mark as Complete';
+      }
+    }
+
+    function toggleSubpageCompletion() {
+      let completed = JSON.parse(localStorage.getItem('completed_python_chapters') || '[]');
+      if (completed.includes(pageId)) {
+        completed = completed.filter(id => id !== pageId);
+      } else {
+        completed.push(pageId);
+      }
+      localStorage.setItem('completed_python_chapters', JSON.stringify(completed));
+      updateCompletionUI();
+    }
+    
+    updateCompletionUI();
+  </script>
+</body>
+</html>

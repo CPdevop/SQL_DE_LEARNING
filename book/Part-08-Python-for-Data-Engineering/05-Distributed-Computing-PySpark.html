@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Distributed Data Processing with PySpark - SQL & Python Curriculum</title>
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  
+  <!-- KaTeX Math CSS -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+  
+  <!-- Prism.js Dark/Light CSS -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" id="prism-theme">
+  
+  <!-- Shared Style Sheet -->
+  <link rel="stylesheet" href="../../style.css">
+  
+  <script>
+    // Immediate script to prevent theme flash
+    (function() {
+      const theme = localStorage.getItem('theme') || 'dark';
+      document.documentElement.setAttribute('data-theme', theme);
+    })();
+  </script>
+</head>
+<body>
+  
+  <header class="site-header">
+    <div class="header-container">
+      <a href="../../index.html" class="back-link">← Back to Curriculum Directory</a>
+      <div class="header-actions">
+        <button class="theme-toggle-btn" id="theme-btn">🌙 Dark Mode</button>
+      </div>
+    </div>
+  </header>
+  
+  <main class="content-wrapper">
+    <article class="markdown-body">
+      <h1 id="chapter-5-distributed-data-processing-with-pyspark">Chapter 5: Distributed Data Processing with PySpark</h1><blockquote>
+<p><strong>Part:</strong> Python for Data Engineering</p>
+<p><strong>Chapter:</strong> 5</p>
+<p><strong>Difficulty:</strong> 🔴 Advanced</p>
+<p><strong>Estimated Reading Time:</strong> 55–70 minutes</p>
+<p><strong>Prerequisites:</strong> Chapters 1–4, basic SQL</p>
+<p><strong>Target Audience:</strong> Data Engineers, Spark Developers, Platform Engineers</p>
+<p><strong>Version:</strong> 2.0</p>
+<p><strong>Last Updated:</strong> 2026-07-06</p>
+</blockquote>
+<hr>
+<h1 id="learning-objectives">Learning Objectives</h1><p>After completing this chapter, you will be able to:</p>
+<ul>
+<li>Explain Spark&#39;s internal execution engine, detailing the <strong>Catalyst Optimizer</strong> stages and <strong>Tungsten</strong> memory optimizations.</li>
+<li>Demystify the <strong>Shuffle Phase</strong> and configure partition settings to prevent network bottlenecks.</li>
+<li>Troubleshoot and fix <strong>Out-Of-Memory (OOM)</strong> exceptions on drivers and executors.</li>
+<li>Mitigate partition skew using <strong>key salting</strong> techniques.</li>
+<li>Programmatically construct PySpark DataFrames, defining schemas using <code>StructType</code> and <code>StructField</code>.</li>
+<li>Apply Spark SQL queries and DataFrame API transformations to ingest and analyze large datasets.</li>
+<li>Optimize PySpark jobs using Broadcast Joins, custom partitioning, and appropriate caching levels.</li>
+<li>Implement analytical window functions for ranking and sequential aggregation.</li>
+<li>Differentiate between PySpark UDFs and Vectorized/Pandas UDFs to avoid serialization bottlenecks.</li>
+</ul>
+<hr>
+<h1 id="quick-revision">Quick Revision</h1><ul>
+<li><strong>Driver Node:</strong> Coordinates execution, runs <code>main()</code>, translates code into tasks, and tracks executor statuses.</li>
+<li><strong>Executor Nodes:</strong> Processes tasks assigned by the Driver, storing data in RAM or local disk.</li>
+<li><strong>Lazy Evaluation:</strong> Spark does not compute transformations immediately. It plans them into a DAG (lineage) and executes them only when an <strong>Action</strong> is called.</li>
+<li><strong>Transformations:</strong> Operations that return a new DataFrame (e.g., <code>filter()</code>, <code>select()</code>, <code>join()</code>). Can be narrow or wide.</li>
+<li><strong>Actions:</strong> Operations that trigger computation and return results to the driver or write to storage (e.g., <code>count()</code>, <code>collect()</code>, <code>save()</code>).</li>
+<li><strong>Catalyst Optimizer:</strong> Spark&#39;s query optimizer that translates code into optimized physical execution plans.</li>
+<li><strong>Tungsten Engine:</strong> Optimizes physical execution by managing JVM memory directly, avoiding JVM garbage collection overhead.</li>
+<li><strong>Data Skew:</strong> An uneven distribution of data across partitions, causing a single executor to process the majority of the dataset while others sit idle.</li>
+<li><strong>Broadcast Join:</strong> Replicates a small DataFrame to all executors, completely bypassing expensive network shuffles during joins.</li>
+</ul>
+<hr>
+<h1 id="spark-architecture-the-catalysttungsten-engines">Spark Architecture &amp; The Catalyst/Tungsten Engines</h1><p>Apache Spark is a distributed computing engine. Because Spark is written in Scala (running on the JVM), PySpark utilizes a library called <strong>Py4J</strong> to bridge the gap.</p>
+<pre><code class="language-mermaid">graph TD
+    Driver[Driver Program - Python API] --&gt;|Py4J Gateway| JVM_Driver[JVM SparkContext]
+    JVM_Driver --&gt;|Cluster Manager| Executors[Executors - JVMs]
+    Executors --&gt;|Pipes| PyWorkers[Python Worker Processes]
+    style Driver fill:#f9f,stroke:#333,stroke-width:2px
+    style JVM_Driver fill:#bbf,stroke:#333,stroke-width:2px
+    style Executors fill:#ddf,stroke:#333,stroke-width:2px
+    style PyWorkers fill:#fdd,stroke:#333,stroke-width:2px
+</code></pre>
+<h2 id="1-under-the-hood-catalyst-optimizer">1. Under the Hood: Catalyst Optimizer</h2><p>When you write Spark SQL or DataFrame operations, the <strong>Catalyst Optimizer</strong> translates your code into an optimized execution plan through four distinct stages:</p>
+<pre><code class="language-text">User Code 
+   ↓
+[1. Analysis] ───────→ Resolves table/column names against Catalog/Metastore
+   ↓
+[2. Logical Plan] ───→ Applies optimization rules (e.g. filter pushdown, constant folding)
+   ↓
+[3. Physical Plan] ──→ Generates multiple physical plans, cost model selects the best one
+   ↓
+[4. Code Generation] → Compiles bytecode dynamically at runtime (Java source generated)
+</code></pre>
+<ul>
+<li><strong>Filter Pushdown:</strong> If you write <code>df.load().filter(col(&quot;id&quot;) == 5)</code>, Catalyst pushes the filter directly to the storage layer, loading only the matching rows instead of the entire dataset.</li>
+</ul>
+<h2 id="2-tungsten-execution-engine">2. Tungsten Execution Engine</h2><p>Tungsten manages memory directly at the byte level using off-heap memory allocations (<code>sun.misc.Unsafe</code>), avoiding the overhead of JVM objects and garbage collection. It also uses cache-aware computation to keep operations entirely inside CPU registers.</p>
+<hr>
+<h1 id="the-shuffle-phase-deep-dive">The Shuffle Phase Deep-Dive</h1><p>A <strong>Shuffle</strong> is the process of redistributing data across partitions on different executors. It is triggered by wide transformations like <code>groupBy()</code>, <code>join()</code>, and <code>distinct()</code>.</p>
+<h3 id="why-shuffling-is-slow">Why Shuffling is Slow:</h3><ol>
+<li><strong>Disk I/O:</strong> Executors must write intermediate shuffle partitions to local disk.</li>
+<li><strong>Network I/O:</strong> Data is sent across the network to the executors processing the target keys.</li>
+<li><strong>Serialization:</strong> Objects must be serialized to bytes before transmission, and deserialized on the receiving end.</li>
+</ol>
+<pre><code class="language-python"># Default partition count for shuffle operations is 200
+# spark.conf.set(&quot;spark.sql.shuffle.partitions&quot;, &quot;200&quot;)
+</code></pre>
+<ul>
+<li><strong>The Bottleneck:</strong> If you process a small 10MB dataset with the default setting, Spark splits the data into 200 partitions, creating massive scheduling overhead. Conversely, if you process a 1TB dataset, 200 partitions is too few, and each partition will be too large to fit in executor memory, causing disk spill or OOM crashes.</li>
+<li><strong>Rule of Thumb:</strong> Aim for partition sizes between <strong>100MB and 200MB</strong> in memory. Adjust <code>spark.sql.shuffle.partitions</code> dynamically depending on the dataset size.</li>
+</ul>
+<hr>
+<h1 id="troubleshooting-oom-data-skew">Troubleshooting OOM &amp; Data Skew</h1><h2 id="1-fixing-out-of-memory-oom-errors">1. Fixing Out-Of-Memory (OOM) Errors</h2><p>OOM errors occur on either the Driver or Executors:</p>
+<ul>
+<li><strong>Driver OOM:</strong> Caused by calling <code>.collect()</code> on a massive dataset, pulling all rows from executors into the driver&#39;s memory.<ul>
+<li><em>The Fix:</em> Avoid <code>collect()</code> in production. Use <code>.write</code> to save results directly to storage, or use <code>.take(n)</code> to inspect only a few rows.</li>
+</ul>
+</li>
+<li><strong>Executor OOM:</strong> Caused by partition sizes that exceed executor memory limits, or by memory leaks inside custom Python UDFs.<ul>
+<li><em>The Fix:</em> Increase executor memory, adjust partition counts, or avoid Python UDFs.</li>
+</ul>
+</li>
+</ul>
+<h2 id="2-mitigating-data-skew-via-key-salting">2. Mitigating Data Skew via Key Salting</h2><p>Data skew happens when a specific key (e.g. <code>country = &#39;US&#39;</code>) has significantly more rows than other keys. The executor handling the &#39;US&#39; partition will take much longer to finish, leaving other executors idle (the &quot;straggler&quot; effect).</p>
+<p><strong>The Solution: Key Salting</strong>
+Append a random integer suffix (e.g., <code>0</code> to <code>N-1</code>) to the join key of the skewed table, and replicate the lookup rows in the dimension table to match these salted keys, distributing the load evenly across executors.</p>
+<pre><code class="language-python">from pyspark.sql.functions import col, concat, lit, rand, explode, array
+
+# Skewed transactions dataset
+skewed_tx_df = spark.read.parquet(&quot;s3://data/transactions/&quot;)
+
+# Salt the transaction join key: append random suffix &quot;0&quot; to &quot;3&quot;
+salted_tx_df = skewed_tx_df.withColumn(
+    &quot;salted_join_key&quot;, 
+    concat(col(&quot;user_id&quot;), lit(&quot;_&quot;), (rand() * 4).cast(&quot;int&quot;))
+)
+
+# Small users metadata lookup table
+users_df = spark.read.parquet(&quot;s3://data/users/&quot;)
+
+# Replicate users rows 4 times to match salted keys
+replicated_users_df = users_df.withColumn(
+    &quot;salt_array&quot;, 
+    array([lit(i) for i in range(4)])
+).withColumn(&quot;salt&quot;, explode(col(&quot;salt_array&quot;))) \
+ .withColumn(&quot;salted_join_key&quot;, concat(col(&quot;user_id&quot;), lit(&quot;_&quot;), col(&quot;salt&quot;)))
+
+# Perform join on salted keys: data is balanced across partitions
+balanced_joined_df = salted_tx_df.join(
+    replicated_users_df, 
+    on=&quot;salted_join_key&quot;, 
+    how=&quot;inner&quot;
+)
+</code></pre>
+<hr>
+<h1 id="core-concepts-lineage-lazy-evaluation-dags">Core Concepts: Lineage, Lazy Evaluation &amp; DAGs</h1><h3 id="transformations-vs-actions">Transformations vs. Actions</h3><ul>
+<li><strong>Narrow Transformations:</strong> Work on single partitions. No data needs to be moved across executors (e.g., <code>select()</code>, <code>filter()</code>, <code>map()</code>).</li>
+<li><strong>Wide Transformations (Shuffles):</strong> Require data to be redistributed across partitions on different executors (e.g., <code>groupBy()</code>, <code>join()</code>, <code>distinct()</code>). Shuffles are slow because they write temporary files to disk and send data over the network.</li>
+<li><strong>Actions:</strong> Trigger the actual computation (e.g., <code>show()</code>, <code>collect()</code>, <code>write()</code>).</li>
+</ul>
+<pre><code class="language-python"># Lazy: No execution occurs yet, Spark just registers the read schema
+df = spark.read.parquet(&quot;s3://logs/raw_events/&quot;)
+
+# Lazy: Narrow transformations added to execution plan
+filtered_df = df.filter(df[&quot;status&quot;] == &quot;ERROR&quot;).select(&quot;user_id&quot;, &quot;timestamp&quot;)
+
+# Eager Action: Triggers the Spark Job, executes the DAG, and prints results
+filtered_df.show(5)
+</code></pre>
+<hr>
+<h1 id="pyspark-dataframe-api-spark-sql">PySpark DataFrame API &amp; Spark SQL</h1><h2 id="1-defining-explicit-schemas">1. Defining Explicit Schemas</h2><p>Explicitly defining schemas is best practice in production. It prevents schema drift and avoids reading entire files just to infer types.</p>
+<pre><code class="language-python">from pyspark.sql.types import StructType, StructField, StringType, IntegerType, DoubleType
+
+schema = StructType([
+    StructField(&quot;transaction_id&quot;, StringType(), False),
+    StructField(&quot;user_id&quot;, IntegerType(), True),
+    StructField(&quot;amount&quot;, DoubleType(), True),
+    StructField(&quot;timestamp&quot;, StringType(), True)
+])
+
+df = spark.read.format(&quot;csv&quot;) \
+    .option(&quot;header&quot;, &quot;true&quot;) \
+    .schema(schema) \
+    .load(&quot;s3://transactions/*.csv&quot;)
+</code></pre>
+<h2 id="2-dataframe-apis-spark-sql">2. DataFrame APIs &amp; Spark SQL</h2><p>You can transform data using DataFrame APIs or run SQL queries directly by creating a temporary view.</p>
+<pre><code class="language-python"># DataFrame API Approach
+api_df = df.filter(df[&quot;amount&quot;] &gt; 100.0) \
+    .groupBy(&quot;user_id&quot;) \
+    .sum(&quot;amount&quot;)
+
+# SQL Approach
+df.createOrReplaceTempView(&quot;transactions&quot;)
+sql_df = spark.sql(&quot;&quot;&quot;
+    SELECT user_id, SUM(amount) as total_amount
+    FROM transactions
+    WHERE amount &gt; 100.0
+    GROUP BY user_id
+&quot;&quot;&quot;)
+</code></pre>
+<hr>
+<h1 id="performance-tuning-optimizations">Performance Tuning &amp; Optimizations</h1><h2 id="1-broadcast-joins">1. Broadcast Joins</h2><p>When joining a large table with a small lookup table, standard joins shuffle data from both tables across the network. A <strong>Broadcast Join</strong> sends the entire small table to every executor, avoiding the shuffle step entirely.</p>
+<pre><code class="language-python">from pyspark.sql.functions import broadcast
+
+# Large transaction log (Millions of rows)
+tx_df = spark.read.parquet(&quot;s3://data/transactions/&quot;)
+
+# Small region lookup table (50 rows)
+regions_df = spark.read.json(&quot;s3://data/regions/&quot;)
+
+# Broadcast join: Shuffling is prevented for tx_df
+joined_df = tx_df.join(broadcast(regions_df), &quot;region_id&quot;, &quot;inner&quot;)
+</code></pre>
+<h2 id="2-partitioning-vs-coalescing">2. Partitioning vs. Coalescing</h2><p>Managing partition counts is key to preventing &quot;small file problems&quot; and resource starvation.</p>
+<ul>
+<li><strong><code>repartition(n)</code>:</strong> Shuffles all data across the network to create exactly <span class="math-inline">\(n\)</span> equally-sized partitions. Can increase or decrease partitions.</li>
+<li><strong><code>coalesce(n)</code>:</strong> Decreases the partition count <em>without</em> triggering a full shuffle by merging adjacent partitions.</li>
+</ul>
+<pre><code class="language-python"># Repartitioning before a join to ensure balanced work
+balanced_df = tx_df.repartition(10, &quot;region_id&quot;)
+
+# Coalescing to 1 partition before writing a single output CSV
+balanced_df.coalesce(1).write.csv(&quot;s3://reports/sales_summary/&quot;)
+</code></pre>
+<h2 id="3-caching-persistence">3. Caching &amp; Persistence</h2><p>If you plan to reuse a DataFrame multiple times in your script, cache it to avoid recalculating its lineage from scratch.</p>
+<ul>
+<li><code>cache()</code>: Saves data in memory with a default storage level (<code>MEMORY_AND_DISK</code>).</li>
+<li><code>persist(storageLevel)</code>: Allows customizing where data is stored (e.g. memory-only, disk-only, or replicated).</li>
+</ul>
+<pre><code class="language-python"># Cache intermediate transformed DataFrame
+joined_df.cache()
+
+# Action 1: Count trigger
+print(joined_df.count())
+
+# Action 2: Write trigger (reads directly from cache instead of re-reading raw files)
+joined_df.write.parquet(&quot;s3://warehouse/processed/&quot;)
+
+# Crucial: Release cache once done
+joined_df.unpersist()
+</code></pre>
+<hr>
+<h1 id="advanced-pyspark-window-functions-udfs">Advanced PySpark: Window Functions &amp; UDFs</h1><h2 id="1-window-functions">1. Window Functions</h2><p>Window functions compute results over a group of rows (the &quot;window&quot;) without collapsing them into a single row.</p>
+<pre><code class="language-python">from pyspark.sql.window import Window
+from pyspark.sql.functions import col, row_number, desc
+
+# Define partition window: group by user, ordered by transaction date
+user_window = Window.partitionBy(&quot;user_id&quot;).orderBy(desc(&quot;timestamp&quot;))
+
+# Rank transactions per user to find their most recent transaction
+ranked_df = df.withColumn(&quot;rank&quot;, row_number().over(user_window))
+
+# Filter to get only the latest transaction for each user
+latest_tx_df = ranked_df.filter(col(&quot;rank&quot;) == 1)
+</code></pre>
+<h2 id="2-user-defined-functions-udfs-performance-traps">2. User-Defined Functions (UDFs): Performance Traps</h2><p>Standard Python UDFs run slowly because Spark has to serialize data out of the JVM to run it in Python processes. 
+To write custom functions efficiently:</p>
+<ol>
+<li>Try to use built-in <strong><code>pyspark.sql.functions</code></strong> first (they run natively inside the JVM).</li>
+<li>If custom logic is required, use <strong>Pandas UDFs</strong> (Vectorized UDFs). Under the hood, they use Apache Arrow to transfer data in high-speed binary batches, applying vectorized operations using Pandas.</li>
+</ol>
+<pre><code class="language-python">from pyspark.sql.functions import pandas_udf
+import pandas as pd
+
+# Define a Pandas UDF (Series to Series transformation)
+@pandas_udf(&quot;double&quot;)
+def calculate_tax_vectorized(amount: pd.Series) -&gt; pd.Series:
+    return amount * 0.15
+
+# Applying vectorized UDF
+tax_applied_df = df.withColumn(&quot;tax&quot;, calculate_tax_vectorized(col(&quot;amount&quot;)))
+</code></pre>
+<hr>
+<h1 id="exercises-quiz">Exercises &amp; Quiz</h1><h3 id="question-1">Question 1</h3><p>How does Catalyst&#39;s &quot;Filter Pushdown&quot; optimization improve execution performance?</p>
+<ul>
+<li>A) It deletes columns before writing to disk.</li>
+<li>B) It compiles code into C++.</li>
+<li>C) It pushes filter operations down to the storage layer, loading only the matching rows instead of the entire dataset.</li>
+<li>D) It bypasses network shuffles.</li>
+</ul>
+<p><em>Answer:</em> <strong>C</strong>. Filter pushdown minimizes disk reads and network transfers by applying filters directly at the storage level.</p>
+<h3 id="question-2">Question 2</h3><p>What is the primary cause of a Driver Out-Of-Memory (OOM) exception?</p>
+<ul>
+<li>A) Writing files in Parquet format.</li>
+<li>B) Calling <code>.collect()</code> on a large dataset, pulling all executor records into the driver&#39;s memory.</li>
+<li>C) Using the <code>coalesce</code> command.</li>
+<li>D) Replicating tables using Broadcast joins.</li>
+</ul>
+<p><em>Answer:</em> <strong>B</strong>. Calling <code>.collect()</code> pulls all distributed executor rows into the driver node, easily exceeding its memory limits.</p>
+<hr>
+<h1 id="chapter-summary-checklist">Chapter Summary Checklist</h1><ul>
+<li>Can you list the four execution optimization stages of Catalyst?</li>
+<li>How does the default partition count (<code>200</code>) affect performance on small datasets?</li>
+<li>How do you resolve executor OOM errors during shuffles?</li>
+<li>What is key salting, and when should you implement it?</li>
+</ul>
+
+    </article>
+    
+    
+    <div class="subpage-complete-area">
+      <div class="subpage-complete-text">Finished reading this chapter? Mark it as complete to track your progress!</div>
+      <div class="checkbox-btn-wrapper">
+        <button class="theme-toggle-btn" id="subpage-complete-btn" onclick="toggleSubpageCompletion('ch-45')">
+          <span id="complete-status-icon">⏳</span>
+          <span id="complete-status-text">Mark as Complete</span>
+        </button>
+      </div>
+    </div>
+  
+    <div class="page-nav-footer">
+        <a href="04-Data-Manipulation-NumPy-and-Pandas.html" class="nav-footer-btn prev">
+          <span class="nav-footer-label">← Previous Chapter</span>
+          <span class="nav-footer-title">Data Wrangling with NumPy & Pandas</span>
+        </a>
+      
+        <a href="06-Data-Orchestration-Apache-Airflow.html" class="nav-footer-btn next">
+          <span class="nav-footer-label">Next Chapter →</span>
+          <span class="nav-footer-title">Workflow Orchestration with Apache Airflow</span>
+        </a>
+      </div>
+  </main>
+
+  <!-- KaTeX & Prism Scripts -->
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js" onload="initKaTeX()"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-core.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+  <script>
+    const pageId = 'ch-45';
+    let currentTheme = localStorage.getItem('theme') || 'dark';
+    
+    // Auto KaTeX setup
+    function initKaTeX() {
+      if (window.renderMathInElement) {
+        window.renderMathInElement(document.body, {
+          delimiters: [
+            {left: '$$', right: '$$', display: true},
+            {left: '\(', right: '\)', display: false},
+            {left: '$', right: '$', display: false}
+          ],
+          throwOnError : false
+        });
+      }
+    }
+
+    // Set Theme Toggler Content
+    const themeBtn = document.getElementById('theme-btn');
+    function updateThemeUI() {
+      themeBtn.innerHTML = currentTheme === 'dark' ? '🌙 Dark Mode' : '☀️ Light Mode';
+      const prismStyle = document.getElementById('prism-theme');
+      if (prismStyle) {
+        if (currentTheme === 'light') {
+          prismStyle.href = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css';
+        } else {
+          prismStyle.href = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css';
+        }
+      }
+    }
+    
+    themeBtn.addEventListener('click', () => {
+      currentTheme = currentTheme === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', currentTheme);
+      localStorage.setItem('theme', currentTheme);
+      updateThemeUI();
+    });
+    
+    updateThemeUI(); // Run immediately on load
+
+    // Copy action for code listings
+    function setupCodeBlocks() {
+      const codeBlocks = document.querySelectorAll('pre');
+      codeBlocks.forEach(block => {
+        const btn = document.createElement('button');
+        btn.className = 'copy-btn';
+        btn.innerText = 'Copy';
+        btn.onclick = () => {
+          const code = block.querySelector('code').innerText;
+          navigator.clipboard.writeText(code).then(() => {
+            btn.innerText = 'Copied!';
+            setTimeout(() => { btn.innerText = 'Copy'; }, 2000);
+          });
+        };
+        block.appendChild(btn);
+      });
+    }
+    setupCodeBlocks();
+
+    // Completion Status handling
+    function updateCompletionUI() {
+      const compBtn = document.getElementById('subpage-complete-btn');
+      if (!compBtn) return;
+      
+      const completed = JSON.parse(localStorage.getItem('completed_python_chapters') || '[]');
+      const isDone = completed.includes(pageId);
+      
+      const iconSpan = document.getElementById('complete-status-icon');
+      const textSpan = document.getElementById('complete-status-text');
+      
+      if (isDone) {
+        compBtn.style.backgroundColor = 'rgba(16, 185, 129, 0.15)';
+        compBtn.style.borderColor = '#10b981';
+        compBtn.style.color = '#10b981';
+        iconSpan.innerText = '✅';
+        textSpan.innerText = 'Completed';
+      } else {
+        compBtn.style.backgroundColor = 'var(--bg-primary)';
+        compBtn.style.borderColor = 'var(--border-color)';
+        compBtn.style.color = 'var(--text-primary)';
+        iconSpan.innerText = '⏳';
+        textSpan.innerText = 'Mark as Complete';
+      }
+    }
+
+    function toggleSubpageCompletion() {
+      let completed = JSON.parse(localStorage.getItem('completed_python_chapters') || '[]');
+      if (completed.includes(pageId)) {
+        completed = completed.filter(id => id !== pageId);
+      } else {
+        completed.push(pageId);
+      }
+      localStorage.setItem('completed_python_chapters', JSON.stringify(completed));
+      updateCompletionUI();
+    }
+    
+    updateCompletionUI();
+  </script>
+</body>
+</html>

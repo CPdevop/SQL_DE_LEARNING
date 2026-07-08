@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Data Wrangling with NumPy & Pandas - SQL & Python Curriculum</title>
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  
+  <!-- KaTeX Math CSS -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+  
+  <!-- Prism.js Dark/Light CSS -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" id="prism-theme">
+  
+  <!-- Shared Style Sheet -->
+  <link rel="stylesheet" href="../../style.css">
+  
+  <script>
+    // Immediate script to prevent theme flash
+    (function() {
+      const theme = localStorage.getItem('theme') || 'dark';
+      document.documentElement.setAttribute('data-theme', theme);
+    })();
+  </script>
+</head>
+<body>
+  
+  <header class="site-header">
+    <div class="header-container">
+      <a href="../../index.html" class="back-link">← Back to Curriculum Directory</a>
+      <div class="header-actions">
+        <button class="theme-toggle-btn" id="theme-btn">🌙 Dark Mode</button>
+      </div>
+    </div>
+  </header>
+  
+  <main class="content-wrapper">
+    <article class="markdown-body">
+      <h1 id="chapter-4-data-wrangling-with-numpy-pandas">Chapter 4: Data Wrangling with NumPy &amp; Pandas</h1><blockquote>
+<p><strong>Part:</strong> Python for Data Engineering</p>
+<p><strong>Chapter:</strong> 4</p>
+<p><strong>Difficulty:</strong> 🟡 Intermediate</p>
+<p><strong>Estimated Reading Time:</strong> 50–65 minutes</p>
+<p><strong>Prerequisites:</strong> Chapters 1–3</p>
+<p><strong>Target Audience:</strong> Data Engineers, Data Analysts, Data Scientists</p>
+<p><strong>Version:</strong> 2.0</p>
+<p><strong>Last Updated:</strong> 2026-07-06</p>
+</blockquote>
+<hr>
+<h1 id="learning-objectives">Learning Objectives</h1><p>After completing this chapter, you will be able to:</p>
+<ul>
+<li>Explain NumPy&#39;s memory model, vectorization, and apply <strong>dimension broadcasting</strong> rules.</li>
+<li>Reduce Pandas memory usage by up to 90% using <strong>categorical type casting</strong> and <strong>numeric downcasting</strong>.</li>
+<li>Process large CSV files without running out of RAM using <strong>chunk-by-chunk processing</strong> (<code>chunksize</code>).</li>
+<li>Read and write file formats commonly used in Data Lakes (Parquet, JSON, CSV) and databases.</li>
+<li>Navigate index levels, query data with boolean filters, and use <code>.loc</code> and <code>.iloc</code> safely.</li>
+<li>Perform database-equivalent joins, unions, and aggregations using <code>merge</code>, <code>concat</code>, and <code>groupby</code>.</li>
+<li>Clean and impute missing data safely, avoiding copying warnings (<code>SettingWithCopyWarning</code>).</li>
+<li>Manipulate timestamp fields in transactional datasets.</li>
+</ul>
+<hr>
+<h1 id="quick-revision">Quick Revision</h1><ul>
+<li><strong>Vectorization:</strong> Computing operations on entire arrays at compile-time (C-speed) rather than executing slow interpreter-level loops.</li>
+<li><strong>Broadcasting:</strong> NumPy&#39;s ability to perform operations on arrays of different shapes during arithmetic.</li>
+<li><strong>Categorical Dtype:</strong> Casts low-cardinality string columns to category mappings, saving memory by representing strings as integer IDs under the hood.</li>
+<li><strong>Downcasting:</strong> Truncating large types (e.g. <code>float64</code>) to smaller, memory-efficient sizes (e.g. <code>float32</code>) if values fit.</li>
+<li><strong><code>chunksize</code>:</strong> Parameter in <code>read_csv</code> returning an iterator that loads the file in manageable batches, keeping memory usage constant.</li>
+<li><strong>Series:</strong> A 1D labeled array.</li>
+<li><strong>DataFrame:</strong> A 2D tabular structure containing columns of different types (effectively a dictionary of Series).</li>
+<li><strong><code>loc</code> vs. <code>iloc</code>:</strong> <code>loc</code> is label-based indexing; <code>iloc</code> is integer position-based indexing.</li>
+<li><strong><code>SettingWithCopyWarning</code>:</strong> A warning raised by Pandas when you attempt to modify a view instead of a direct copy of a DataFrame.</li>
+</ul>
+<hr>
+<h1 id="numpy-foundations-broadcasting-rules">NumPy Foundations &amp; Broadcasting Rules</h1><p>NumPy (<code>Numerical Python</code>) stores data in contiguous blocks of memory using homogeneous types.</p>
+<h3 id="vectorization-vs-loops">Vectorization vs. Loops</h3><p>In raw Python, adding 1 to a list of a million numbers requires iterating over each element and fetching its object pointer. In NumPy, this is done in one C-level vectorized sweep.</p>
+<pre><code class="language-python">import numpy as np
+import time
+
+# Create a million numbers
+size = 1000000
+py_list = list(range(size))
+np_arr = np.arange(size)
+
+# Time raw python loop
+t0 = time.time()
+py_list_plus_one = [x + 1 for x in py_list]
+print(f&quot;Python loop time: {time.time() - t0:.5f}s&quot;)
+
+# Time NumPy vectorized operation
+t0 = time.time()
+np_arr_plus_one = np_arr + 1  # Vectorized operation
+print(f&quot;NumPy vector time: {time.time() - t0:.5f}s&quot;)  # Usually 20-50x faster!
+</code></pre>
+<h3 id="broadcasting-rules">Broadcasting Rules</h3><p>Broadcasting allows mathematical operations on arrays of different dimensions. When operating on two arrays, NumPy compares their shapes element-wise, starting from the trailing dimensions. Two dimensions are compatible if:</p>
+<ol>
+<li>They are <strong>equal</strong>, or</li>
+<li>One of them is <strong>1</strong>.</li>
+</ol>
+<pre><code class="language-python"># Array A: Shape (3, 4)
+# Array B: Shape (1, 4) -&gt; Broadcasts along the first dimension to size 3
+A = np.array([
+    [1, 2, 3, 4],
+    [5, 6, 7, 8],
+    [9, 10, 11, 12]
+])
+B = np.array([10, 20, 30, 40]) # Shape (4,) is implicitly treated as (1, 4)
+
+# B is stretched to match A&#39;s dimension and added element-wise
+result = A + B
+print(result)
+</code></pre>
+<hr>
+<h1 id="pandas-memory-optimization-techniques">Pandas Memory Optimization Techniques</h1><p>Large transactional files can quickly exhaust memory on resource-constrained servers. We can reduce our memory footprint using three main techniques:</p>
+<h2 id="1-downcasting-numeric-types">1. Downcasting Numeric Types</h2><p>By default, Pandas imports integers as <code>int64</code> and floats as <code>float64</code>. If your values only range from 0 to 100, <code>int8</code> is sufficient and uses much less memory.</p>
+<pre><code class="language-python">import pandas as pd
+
+# Downcast floats from float64 to float32
+df = pd.DataFrame({&quot;large_floats&quot;: [1.5, 2.7, 3.9] * 100000})
+print(f&quot;Original Memory: {df.memory_usage(deep=True).sum()} bytes&quot;)
+
+df[&quot;large_floats&quot;] = pd.to_numeric(df[&quot;large_floats&quot;], downcast=&quot;float&quot;)
+print(f&quot;Optimized Memory: {df.memory_usage(deep=True).sum()} bytes&quot;) # Saves 50%!
+</code></pre>
+<h2 id="2-casting-low-cardinality-strings-to-category">2. Casting Low-Cardinality Strings to <code>category</code></h2><p>If a column with millions of rows only contains a few unique values (e.g. <code>status</code> or <code>country</code>), casting it to the <code>category</code> data type saves memory. Under the hood, Pandas maps each unique string to a small integer ID, storing the strings themselves only once.</p>
+<pre><code class="language-python">df_regions = pd.DataFrame({&quot;region&quot;: [&quot;North America&quot;, &quot;Europe&quot;, &quot;Asia&quot;] * 100000})
+print(f&quot;Original String Memory: {df_regions.memory_usage(deep=True).sum()} bytes&quot;)
+
+# Convert to category
+df_regions[&quot;region&quot;] = df_regions[&quot;region&quot;].astype(&quot;category&quot;)
+print(f&quot;Optimized Category Memory: {df_regions.memory_usage(deep=True).sum()} bytes&quot;) # Saves &gt;90%!
+</code></pre>
+<h2 id="3-chunk-by-chunk-file-processing">3. Chunk-by-Chunk File Processing</h2><p>Instead of loading a massive 5GB CSV file into memory at once, use the <code>chunksize</code> parameter to process the file in smaller, manageable batches.</p>
+<pre><code class="language-python"># Process a large CSV file in chunks of 50,000 rows
+chunk_size = 50000
+total_revenue = 0
+
+# read_csv returns an iterator when chunksize is provided
+for chunk in pd.read_csv(&quot;giant_transactions.csv&quot;, chunksize=chunk_size):
+    # Process the chunk in memory, then release it
+    total_revenue += chunk[&quot;amount&quot;].sum()
+    
+print(f&quot;Calculated Total Revenue: {total_revenue}&quot;)
+</code></pre>
+<hr>
+<h1 id="pandas-indexing-querying">Pandas Indexing &amp; Querying</h1><p>Pandas DataFrames align data using row index levels.</p>
+<h3 id="1-index-structures-multi-indexing">1. Index Structures &amp; Multi-indexing</h3><p>Indices allow faster label lookups. A <code>MultiIndex</code> groups rows hierarchically, representing dimensions.</p>
+<pre><code class="language-python">data = {
+    &quot;region&quot;: [&quot;US&quot;, &quot;US&quot;, &quot;EU&quot;, &quot;EU&quot;],
+    &quot;product&quot;: [&quot;SaaS&quot;, &quot;Hardware&quot;, &quot;SaaS&quot;, &quot;Hardware&quot;],
+    &quot;sales&quot;: [50000, 20000, 45000, 10000]
+}
+df_idx = pd.DataFrame(data)
+
+# Set composite index (MultiIndex)
+df_idx.set_index([&quot;region&quot;, &quot;product&quot;], inplace=True)
+print(df_idx)
+
+# Retrieve specific group slice
+print(df_idx.loc[(&quot;US&quot;, &quot;SaaS&quot;)])
+</code></pre>
+<h3 id="2-selection-and-filtering-loc-vs-iloc">2. Selection and Filtering: <code>loc</code> vs. <code>iloc</code></h3><table>
+<thead>
+<tr>
+<th align="left">Indexer</th>
+<th align="left">Syntax</th>
+<th align="left">Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><strong><code>loc</code></strong></td>
+<td align="left"><code>df.loc[row_labels, col_labels]</code></td>
+<td align="left">Selects by <strong>row and column labels</strong>.</td>
+</tr>
+<tr>
+<td align="left"><strong><code>iloc</code></strong></td>
+<td align="left"><code>df.iloc[row_offsets, col_offsets]</code></td>
+<td align="left">Selects by <strong>integer positions/offsets</strong> (0-indexed).</td>
+</tr>
+</tbody></table>
+<pre><code class="language-python">data = {
+    &quot;user_id&quot;: [101, 102, 103],
+    &quot;region&quot;: [&quot;US&quot;, &quot;EU&quot;, &quot;AP&quot;],
+    &quot;spend&quot;: [150.50, 420.00, 75.25]
+}
+df = pd.DataFrame(data)
+df.set_index(&quot;user_id&quot;, inplace=True)
+
+# Select user 102&#39;s spend via loc (label lookup)
+print(df.loc[102, &quot;spend&quot;])  # 420.0
+
+# Select first row, second column via iloc (offset lookup)
+print(df.iloc[0, 1])  # 150.5 (spend of first row)
+</code></pre>
+<hr>
+<h1 id="data-aggregations-joins-unions">Data Aggregations, Joins &amp; Unions</h1><h2 id="1-group-by-aggregation-groupby">1. Group By &amp; Aggregation (<code>groupby</code>)</h2><p>Splits the table, applies function aggregations, and combines results.</p>
+<pre><code class="language-python"># Grouping sales by region and calculating multiple metrics
+sales_data = {
+    &quot;store&quot;: [&quot;NY&quot;, &quot;LA&quot;, &quot;NY&quot;, &quot;CH&quot;, &quot;LA&quot;],
+    &quot;revenue&quot;: [500, 800, 300, 200, 900],
+    &quot;customers&quot;: [20, 35, 12, 8, 40]
+}
+df_sales = pd.DataFrame(sales_data)
+
+summary = df_sales.groupby(&quot;store&quot;).agg(
+    total_revenue=(&quot;revenue&quot;, &quot;sum&quot;),
+    average_customers=(&quot;customers&quot;, &quot;mean&quot;),
+    store_count=(&quot;store&quot;, &quot;count&quot;)
+)
+print(summary)
+</code></pre>
+<h2 id="2-joins-merges">2. Joins &amp; Merges</h2><p>Pandas supports database-style joins using <code>pd.merge()</code>:</p>
+<ul>
+<li><strong>Inner:</strong> Keeps matches in both tables.</li>
+<li><strong>Left:</strong> Keeps all rows from left table, matching rows from right.</li>
+<li><strong>Right:</strong> Keeps all rows from right table, matching rows from left.</li>
+<li><strong>Outer:</strong> Keeps all rows from both tables, filling mismatches with <code>NaN</code>.</li>
+</ul>
+<pre><code class="language-python">df_users = pd.DataFrame({&quot;user_id&quot;: [1, 2, 3], &quot;name&quot;: [&quot;Alice&quot;, &quot;Bob&quot;, &quot;Charlie&quot;]})
+df_transactions = pd.DataFrame({&quot;user_id&quot;: [1, 2, 1], &quot;amount&quot;: [99.0, 45.0, 12.5]})
+
+# Merge (equivalent to inner join)
+df_merged = pd.merge(df_users, df_transactions, on=&quot;user_id&quot;, how=&quot;inner&quot;)
+</code></pre>
+<hr>
+<h1 id="data-cleaning-copy-warnings">Data Cleaning &amp; Copy Warnings</h1><h3 id="avoiding-settingwithcopywarning">Avoiding <code>SettingWithCopyWarning</code></h3><p>This warning occurs when you chain selectors (e.g. <code>df[df[&#39;spend&#39;] &gt; 100][&#39;spend&#39;] = 0</code>). Chained indexing makes it ambiguous whether you are modifying a copy or the original data.
+<strong>The Fix:</strong> Always use <code>.loc</code> or create an explicit copy using <code>.copy()</code>.</p>
+<pre><code class="language-python"># Safe correction
+high_spenders = df.loc[df[&quot;spend&quot;] &gt; 100].copy()
+high_spenders[&quot;tier&quot;] = &quot;Premium&quot;
+</code></pre>
+<h3 id="vectorized-mapping-vs-apply">Vectorized Mapping vs <code>apply()</code></h3><p>The <code>df.apply()</code> method runs custom functions row-by-row. However, it executes slowly because it runs at Python interpreter speed for every row.
+<strong>Performance Tip:</strong> Use built-in vectorized functions (<code>str</code> methods, <code>np.select</code>, <code>map</code>) instead of <code>apply()</code> whenever possible.</p>
+<pre><code class="language-python"># Slow: using apply
+# df[&#39;status&#39;] = df[&#39;spend&#39;].apply(lambda x: &#39;High&#39; if x &gt; 150 else &#39;Low&#39;)
+
+# Fast: using numpy vectorized select
+df[&quot;status&quot;] = np.where(df[&quot;spend&quot;] &gt; 150, &quot;High&quot;, &quot;Low&quot;)
+</code></pre>
+<hr>
+<h1 id="parsing-timestamps-time-series-basics">Parsing Timestamps &amp; Time Series Basics</h1><p>Data pipelines rely on timestamps for windowing, sorting, and daily partitioning.</p>
+<pre><code class="language-python">data = {
+    &quot;event_time&quot;: [&quot;2026-07-06 14:00:00&quot;, &quot;2026-07-06 15:30:15&quot;, &quot;2026-07-07 09:12:00&quot;],
+    &quot;metric&quot;: [10, 15, 8]
+}
+df_ts = pd.DataFrame(data)
+
+# Convert string object column to datetimes
+df_ts[&quot;event_time&quot;] = pd.to_datetime(df_ts[&quot;event_time&quot;])
+
+# Extract datetime properties
+df_ts[&quot;day&quot;] = df_ts[&quot;event_time&quot;].dt.day
+df_ts[&quot;hour&quot;] = df_ts[&quot;event_time&quot;].dt.hour
+df_ts[&quot;day_name&quot;] = df_ts[&quot;event_time&quot;].dt.day_name()
+</code></pre>
+<hr>
+<h1 id="exercises-quiz">Exercises &amp; Quiz</h1><h3 id="question-1">Question 1</h3><p>Under what conditions does NumPy allow broadcasting on two arrays?</p>
+<ul>
+<li>A) Both arrays must be equal in dimension lengths, or one of them must have a dimension of length 1.</li>
+<li>B) Only when both arrays are one-dimensional.</li>
+<li>C) Both arrays must contain only integers.</li>
+<li>D) It only works on single rows.</li>
+</ul>
+<p><em>Answer:</em> <strong>A</strong>. Dimensions are matched from right to left, and are compatible if they are equal or if one of them is 1.</p>
+<h3 id="question-2">Question 2</h3><p>When importing low-cardinality string columns (like <code>country</code> or <code>gender</code>) in Pandas, how can you reduce memory usage?</p>
+<ul>
+<li>A) Convert them to floats.</li>
+<li>B) Change them to tuples.</li>
+<li>C) Cast them to the <code>category</code> data type using <code>.astype(&#39;category&#39;)</code>.</li>
+<li>D) Split them into multiple tables.</li>
+</ul>
+<p><em>Answer:</em> <strong>C</strong>. Casting low-cardinality strings to categories maps values to integer IDs under the hood, significantly reducing memory usage.</p>
+<hr>
+<h1 id="chapter-summary-checklist">Chapter Summary Checklist</h1><ul>
+<li>Can you explain NumPy&#39;s dimension compatibility rules for broadcasting?</li>
+<li>How does casting columns to the <code>category</code> data type optimize RAM usage?</li>
+<li>How do you configure <code>pd.read_csv</code> to process large files in chunks?</li>
+<li>How do you resolve a <code>SettingWithCopyWarning</code> when writing attributes?</li>
+</ul>
+
+    </article>
+    
+    
+    <div class="subpage-complete-area">
+      <div class="subpage-complete-text">Finished reading this chapter? Mark it as complete to track your progress!</div>
+      <div class="checkbox-btn-wrapper">
+        <button class="theme-toggle-btn" id="subpage-complete-btn" onclick="toggleSubpageCompletion('ch-44')">
+          <span id="complete-status-icon">⏳</span>
+          <span id="complete-status-text">Mark as Complete</span>
+        </button>
+      </div>
+    </div>
+  
+    <div class="page-nav-footer">
+        <a href="03-Object-Oriented-Programming.html" class="nav-footer-btn prev">
+          <span class="nav-footer-label">← Previous Chapter</span>
+          <span class="nav-footer-title">Object-Oriented Programming in Data Engineering</span>
+        </a>
+      
+        <a href="05-Distributed-Computing-PySpark.html" class="nav-footer-btn next">
+          <span class="nav-footer-label">Next Chapter →</span>
+          <span class="nav-footer-title">Distributed Data Processing with PySpark</span>
+        </a>
+      </div>
+  </main>
+
+  <!-- KaTeX & Prism Scripts -->
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js" onload="initKaTeX()"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-core.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+  <script>
+    const pageId = 'ch-44';
+    let currentTheme = localStorage.getItem('theme') || 'dark';
+    
+    // Auto KaTeX setup
+    function initKaTeX() {
+      if (window.renderMathInElement) {
+        window.renderMathInElement(document.body, {
+          delimiters: [
+            {left: '$$', right: '$$', display: true},
+            {left: '\(', right: '\)', display: false},
+            {left: '$', right: '$', display: false}
+          ],
+          throwOnError : false
+        });
+      }
+    }
+
+    // Set Theme Toggler Content
+    const themeBtn = document.getElementById('theme-btn');
+    function updateThemeUI() {
+      themeBtn.innerHTML = currentTheme === 'dark' ? '🌙 Dark Mode' : '☀️ Light Mode';
+      const prismStyle = document.getElementById('prism-theme');
+      if (prismStyle) {
+        if (currentTheme === 'light') {
+          prismStyle.href = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css';
+        } else {
+          prismStyle.href = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css';
+        }
+      }
+    }
+    
+    themeBtn.addEventListener('click', () => {
+      currentTheme = currentTheme === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', currentTheme);
+      localStorage.setItem('theme', currentTheme);
+      updateThemeUI();
+    });
+    
+    updateThemeUI(); // Run immediately on load
+
+    // Copy action for code listings
+    function setupCodeBlocks() {
+      const codeBlocks = document.querySelectorAll('pre');
+      codeBlocks.forEach(block => {
+        const btn = document.createElement('button');
+        btn.className = 'copy-btn';
+        btn.innerText = 'Copy';
+        btn.onclick = () => {
+          const code = block.querySelector('code').innerText;
+          navigator.clipboard.writeText(code).then(() => {
+            btn.innerText = 'Copied!';
+            setTimeout(() => { btn.innerText = 'Copy'; }, 2000);
+          });
+        };
+        block.appendChild(btn);
+      });
+    }
+    setupCodeBlocks();
+
+    // Completion Status handling
+    function updateCompletionUI() {
+      const compBtn = document.getElementById('subpage-complete-btn');
+      if (!compBtn) return;
+      
+      const completed = JSON.parse(localStorage.getItem('completed_python_chapters') || '[]');
+      const isDone = completed.includes(pageId);
+      
+      const iconSpan = document.getElementById('complete-status-icon');
+      const textSpan = document.getElementById('complete-status-text');
+      
+      if (isDone) {
+        compBtn.style.backgroundColor = 'rgba(16, 185, 129, 0.15)';
+        compBtn.style.borderColor = '#10b981';
+        compBtn.style.color = '#10b981';
+        iconSpan.innerText = '✅';
+        textSpan.innerText = 'Completed';
+      } else {
+        compBtn.style.backgroundColor = 'var(--bg-primary)';
+        compBtn.style.borderColor = 'var(--border-color)';
+        compBtn.style.color = 'var(--text-primary)';
+        iconSpan.innerText = '⏳';
+        textSpan.innerText = 'Mark as Complete';
+      }
+    }
+
+    function toggleSubpageCompletion() {
+      let completed = JSON.parse(localStorage.getItem('completed_python_chapters') || '[]');
+      if (completed.includes(pageId)) {
+        completed = completed.filter(id => id !== pageId);
+      } else {
+        completed.push(pageId);
+      }
+      localStorage.setItem('completed_python_chapters', JSON.stringify(completed));
+      updateCompletionUI();
+    }
+    
+    updateCompletionUI();
+  </script>
+</body>
+</html>

@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Control Flow, Comprehensions & Functions - SQL & Python Curriculum</title>
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  
+  <!-- KaTeX Math CSS -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+  
+  <!-- Prism.js Dark/Light CSS -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" id="prism-theme">
+  
+  <!-- Shared Style Sheet -->
+  <link rel="stylesheet" href="../../style.css">
+  
+  <script>
+    // Immediate script to prevent theme flash
+    (function() {
+      const theme = localStorage.getItem('theme') || 'dark';
+      document.documentElement.setAttribute('data-theme', theme);
+    })();
+  </script>
+</head>
+<body>
+  
+  <header class="site-header">
+    <div class="header-container">
+      <a href="../../index.html" class="back-link">← Back to Curriculum Directory</a>
+      <div class="header-actions">
+        <button class="theme-toggle-btn" id="theme-btn">🌙 Dark Mode</button>
+      </div>
+    </div>
+  </header>
+  
+  <main class="content-wrapper">
+    <article class="markdown-body">
+      <h1 id="chapter-2-control-flow-comprehensions-functions">Chapter 2: Control Flow, Comprehensions &amp; Functions</h1><blockquote>
+<p><strong>Part:</strong> Python for Data Engineering</p>
+<p><strong>Chapter:</strong> 2</p>
+<p><strong>Difficulty:</strong> 🟢 Beginner</p>
+<p><strong>Estimated Reading Time:</strong> 40–50 minutes</p>
+<p><strong>Prerequisites:</strong> Chapter 1 (Python Basics &amp; Core Data Structures)</p>
+<p><strong>Target Audience:</strong> Data Engineers, Data Analysts, ETL Developers</p>
+<p><strong>Version:</strong> 2.0</p>
+<p><strong>Last Updated:</strong> 2026-07-06</p>
+</blockquote>
+<hr>
+<h1 id="learning-objectives">Learning Objectives</h1><p>After completing this chapter, you will be able to:</p>
+<ul>
+<li>Design robust control flow logic using conditional branching and short-circuit evaluation.</li>
+<li>Implement the <strong>Iterator Protocol</strong> (<code>__iter__</code>, <code>__next__</code>) and design memory-safe custom generator stream parsers.</li>
+<li>Apply high-performance grouping, slicing, and chaining operations using the <strong><code>itertools</code></strong> standard library.</li>
+<li>Optimize configurations and arguments using functional modules <strong><code>functools</code></strong> (<code>@lru_cache</code> and <code>partial</code>).</li>
+<li>Structure robust exception hierarchies using try-except-else-finally and implement <strong>exception chaining</strong> (<code>raise ... from</code>).</li>
+<li>Trace variable scopes using the LEGB rules.</li>
+</ul>
+<hr>
+<h1 id="quick-revision">Quick Revision</h1><ul>
+<li><strong>Short-Circuit Evaluation:</strong> Operators <code>and</code> and <code>or</code> evaluate conditions lazily. If the first operand determines the outcome, the second is not evaluated.</li>
+<li><strong><code>enumerate(iterable)</code>:</strong> Yields pairs of <code>(index, item)</code>. Great for row counting during parsing.</li>
+<li><strong><code>zip(*iterables)</code>:</strong> Aggregates elements from multiple iterables element-wise.</li>
+<li><strong>Comprehensions:</strong> Lightweight, inline loops creating new lists, dicts, or sets.</li>
+<li><strong>Iterator Protocol:</strong> The standard Python system that allows objects to be looped over using the <code>__iter__</code> and <code>__next__</code> methods.</li>
+<li><strong><code>itertools</code> module:</strong> Built-in functions for high-speed memory-efficient loop processing (e.g. <code>chain</code>, <code>groupby</code>, <code>islice</code>).</li>
+<li><strong><code>functools</code> module:</strong> Utility functions for caching (<code>@lru_cache</code>), argument pre-allocation (<code>partial</code>), and data aggregation (<code>reduce</code>).</li>
+<li><strong>Exception Chaining (<code>raise ... from</code>):</strong> Links a new exception to a caught exception, preserving the diagnostic stack trace.</li>
+</ul>
+<hr>
+<h1 id="conditional-branching-logic">Conditional Branching &amp; Logic</h1><p>Data pipelines route data depending on schemas, states, or dates. Python uses <code>if</code>, <code>elif</code>, and <code>else</code>.</p>
+<h3 id="short-circuit-evaluation">Short-Circuit Evaluation</h3><p>In logical expressions, evaluation stops as soon as the result is determined. This is highly useful for checking nulls before validating attributes.</p>
+<pre><code class="language-python"># Without short-circuit, this would raise an error if record is None
+record = None
+
+if record is not None and record.get(&quot;status&quot;) == &quot;SUCCESS&quot;:
+    print(&quot;Process records&quot;)
+else:
+    print(&quot;Invalid or missing record&quot;)
+</code></pre>
+<p>If <code>record is not None</code> evaluates to <code>False</code>, Python immediately skips evaluating <code>record.get(&quot;status&quot;)</code>, preventing a <code>AttributeError</code>.</p>
+<hr>
+<h1 id="loops-iteration-patterns">Loops &amp; Iteration Patterns</h1><h2 id="1-for-loops">1. <code>for</code> Loops</h2><p><code>for</code> loops are used to iterate over items of any sequence (like a list, tuple, dictionary, or string).</p>
+<h3 id="useful-iteration-helpers">Useful Iteration Helpers:</h3><ul>
+<li><code>enumerate(iterable, start=0)</code>: Tracking index while processing rows.</li>
+<li><code>zip(*iterables)</code>: Combining parallel lists (e.g. matching headers to values).</li>
+</ul>
+<pre><code class="language-python"># Matching CSV headers to database values
+headers = [&quot;id&quot;, &quot;name&quot;, &quot;revenue&quot;]
+row_values = [4012, &quot;Acme Corp&quot;, 850000.00]
+
+# Generating a key-value mapping on the fly
+record = {}
+for header, val in zip(headers, row_values):
+    record[header] = val
+print(record)  # {&#39;id&#39;: 4012, &#39;name&#39;: &#39;Acme Corp&#39;, &#39;revenue&#39;: 850000.0}
+
+# Tracking line numbers in raw log files
+raw_logs = [&quot;WARN: DB connection slow&quot;, &quot;ERROR: Write failed&quot;, &quot;INFO: Job finished&quot;]
+for line_no, log in enumerate(raw_logs, start=1):
+    if &quot;ERROR&quot; in log:
+        print(f&quot;Alert raised at line {line_no}: {log}&quot;)
+</code></pre>
+<h2 id="2-loop-control-break-continue-pass-and-else">2. Loop Control: <code>break</code>, <code>continue</code>, <code>pass</code>, and <code>else</code></h2><ul>
+<li><code>break</code>: Terminates the current loop immediately.</li>
+<li><code>continue</code>: Skips the rest of the current iteration and jumps to the next loop pass.</li>
+<li><code>pass</code>: A null operation; used as a structural placeholder.</li>
+<li><strong><code>else</code> Block on Loops:</strong> Executes ONLY if the loop completes naturally without hitting a <code>break</code> statement.</li>
+</ul>
+<pre><code class="language-python"># Searching for a specific partition file in a directory list
+available_files = [&quot;part-0.parquet&quot;, &quot;part-1.parquet&quot;, &quot;_SUCCESS&quot;, &quot;part-2.parquet&quot;]
+
+for file in available_files:
+    if file == &quot;_SUCCESS&quot;:
+        print(&quot;Success marker found!&quot;)
+        break
+else:
+    # This runs only if the loop finishes WITHOUT hitting break
+    print(&quot;Warning: _SUCCESS marker is missing in directory.&quot;)
+</code></pre>
+<hr>
+<h1 id="custom-iterators-generators">Custom Iterators &amp; Generators</h1><p>In Data Engineering, reading an entire 10GB file into memory before processing is impossible. We use <strong>Iterators</strong> and <strong>Generators</strong> to stream datasets item-by-item.</p>
+<h3 id="1-the-iterator-protocol">1. The Iterator Protocol</h3><p>To make an object iterable, its class must implement two methods:</p>
+<ol>
+<li><code>__iter__()</code>: Returns the iterator object itself.</li>
+<li><code>__next__()</code>: Returns the next value from the container. If no elements are left, it raises a <code>StopIteration</code> exception.</li>
+</ol>
+<p>Let&#39;s implement a custom memory-safe stream simulator:</p>
+<pre><code class="language-python">class RecordStreamSimulator:
+    def __init__(self, limit):
+        self.limit = limit
+        self.current = 0
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        if self.current &gt;= self.limit:
+            raise StopIteration
+        self.current += 1
+        return {&quot;id&quot;: self.current, &quot;event&quot;: &quot;stream_click&quot;}
+
+# Consuming the stream simulator
+stream = RecordStreamSimulator(3)
+for record in stream:
+    print(record)
+</code></pre>
+<h3 id="2-generators-yield">2. Generators &amp; Yield</h3><p>Writing classes implementing the protocol is verbose. Python provides <strong>Generators</strong>—functions that use the <strong><code>yield</code></strong> statement to yield values one-by-one. The function halts its execution state, returning control to the loop, and resumes where it left off on the next iteration.</p>
+<pre><code class="language-python">def log_stream_generator(file_path):
+    with open(file_path, &quot;r&quot;) as file:
+        for line in file:
+            # Yield lines one-by-one without loading the whole file into RAM
+            if &quot;ERROR&quot; in line:
+                yield line.strip()
+</code></pre>
+<hr>
+<h1 id="functional-python-itertools-functools">Functional Python: <code>itertools</code> &amp; <code>functools</code></h1><p>Writing raw nested loops inside ETL tasks can be slow and bug-prone. Python&#39;s standard library offers robust utilities.</p>
+<h2 id="1-high-performance-iteration-with-itertools">1. High-Performance Iteration with <code>itertools</code></h2><ul>
+<li><strong><code>itertools.chain(*iterables)</code>:</strong> Chains multiple sequences together, avoiding list concatenations.</li>
+<li><strong><code>itertools.islice(iterable, start, stop)</code>:</strong> Slices streams without loading them into memory (perfect for API pagination).</li>
+<li><strong><code>itertools.groupby(iterable, keykey)</code>:</strong> Groups adjacent items that share the same key. <strong>Note:</strong> The input dataset <em>must</em> be sorted by the grouping key first.</li>
+</ul>
+<pre><code class="language-python">import itertools
+
+# Chaining multiple files paths lists
+log_paths_a = [&quot;a.log&quot;, &quot;b.log&quot;]
+log_paths_b = [&quot;c.log&quot;, &quot;d.log&quot;]
+for path in itertools.chain(log_paths_a, log_paths_b):
+    print(f&quot;Reading: {path}&quot;)
+
+# Slicing the first 2 items of a continuous stream
+huge_stream = range(1000000)
+first_two = list(itertools.islice(huge_stream, 0, 2))
+print(first_two)  # [0, 1]
+
+# Grouping events (must be sorted by key)
+events = [
+    {&quot;region&quot;: &quot;EU&quot;, &quot;val&quot;: 10},
+    {&quot;region&quot;: &quot;EU&quot;, &quot;val&quot;: 20},
+    {&quot;region&quot;: &quot;US&quot;, &quot;val&quot;: 15}
+]
+grouped = itertools.groupby(events, key=lambda x: x[&quot;region&quot;])
+for key, group in grouped:
+    print(f&quot;Region: {key}, Items: {list(group)}&quot;)
+</code></pre>
+<h2 id="2-functional-operations-with-functools">2. Functional Operations with <code>functools</code></h2><ul>
+<li><strong><code>@lru_cache(maxsize)</code>:</strong> Caches the results of a function based on the arguments passed (Least Recently Used policy). Perfect for caching static DB connection strings or configuration lookups.</li>
+<li><strong><code>functools.partial(func, *args, **kwargs)</code>:</strong> Freezes a portion of a function&#39;s arguments, returning a new callable with fewer parameters.</li>
+</ul>
+<pre><code class="language-python">from functools import lru_cache, partial
+
+# Caching slow config lookups
+@lru_cache(maxsize=16)
+def get_database_uri(environment):
+    print(f&quot;[CACHE MISS] Fetching config for environment: {environment}...&quot;)
+    # Simulate API/SSM parameters call
+    return f&quot;postgresql://admin:secret@{environment}_host:5432/warehouse&quot;
+
+# First access triggers execute
+print(get_database_uri(&quot;production&quot;))
+# Second access fetches from cache
+print(get_database_uri(&quot;production&quot;))
+
+# Partial usage: standardizing logger settings
+def send_log_alert(level, message):
+    print(f&quot;[{level.upper()} ALERT]: {message}&quot;)
+
+# Create specialized logger functions
+log_error = partial(send_log_alert, &quot;ERROR&quot;)
+log_warn = partial(send_log_alert, &quot;WARNING&quot;)
+
+log_error(&quot;Database connection lost!&quot;) # Evaluates as send_log_alert(&quot;ERROR&quot;, ...)
+</code></pre>
+<hr>
+<h1 id="comprehensions-and-memory-efficient-generators">Comprehensions and Memory-Efficient Generators</h1><p>Comprehensions are compact syntax blocks used to build collections.</p>
+<h3 id="list-comprehension">List Comprehension</h3><pre><code class="language-python"># Extract and clean directory paths
+raw_paths = [&quot;  /lake/users/  &quot;, &quot; /lake/orders/ &quot;]
+cleaned_paths = [path.strip() for path in raw_paths]
+</code></pre>
+<h3 id="dictionary-set-comprehension">Dictionary &amp; Set Comprehension</h3><pre><code class="language-python"># Convert configuration keys to lowercase
+config = {&quot;Host&quot;: &quot;127.0.0.1&quot;, &quot;Port&quot;: &quot;5432&quot;}
+cleaned_config = {k.lower(): v for k, v in config.items()}
+# {&#39;host&#39;: &#39;127.0.0.1&#39;, &#39;port&#39;: &#39;5432&#39;}
+
+# Generate unique active status keys
+statuses = [&quot;active&quot;, &quot;inactive&quot;, &quot;active&quot;, &quot;pending&quot;]
+unique_statuses = {s.upper() for s in statuses}
+# {&#39;ACTIVE&#39;, &#39;INACTIVE&#39;, &#39;PENDING&#39;}
+</code></pre>
+<h3 id="generator-expressions-memory-efficiency-in-action">Generator Expressions: Memory Efficiency in Action</h3><p>If you are dealing with a large file containing millions of records, generating a list comprehension loads all records into RAM at once, causing Out-Of-Memory (OOM) exceptions.
+Instead, use a <strong>Generator Expression</strong> (surrounded by <code>()</code>), which creates a generator object that yields records one at a time.</p>
+<pre><code class="language-python"># List Comprehension: Evaluates immediately, loads 10 million elements in memory
+# memory_hog = [x * 2 for x in range(10000000)] # Consumes ~80MB RAM
+
+# Generator Expression: Evaluates lazily, consumes almost zero memory upfront
+lazy_generator = (x * 2 for x in range(10000000))
+
+print(lazy_generator)  # &lt;generator object &lt;genexpr&gt; at ...&gt;
+print(next(lazy_generator))  # 0
+print(next(lazy_generator))  # 2
+</code></pre>
+<hr>
+<h1 id="functions-arguments-and-scopes">Functions, Arguments, and Scopes</h1><p>Functions are defined with the <code>def</code> keyword.</p>
+<h2 id="1-parameters-argument-passing">1. Parameters &amp; Argument Passing</h2><ul>
+<li><strong>Default parameters:</strong> Must follow non-default parameters.</li>
+<li><strong>Keyword-only parameters:</strong> Defined after an asterisk <code>*</code> in the signature. Callers must pass them explicitly as keywords.</li>
+<li><strong><code>*args</code>:</strong> Packs surplus positional arguments into a tuple.</li>
+<li><strong><code>**kwargs</code>:</strong> Packs surplus keyword arguments into a dictionary.</li>
+</ul>
+<pre><code class="language-python">def configure_etl(job_name, *source_files, target_format=&quot;parquet&quot;, **options):
+    print(f&quot;Running ETL: {job_name}&quot;)
+    print(f&quot;Sources: {source_files}&quot;)
+    print(f&quot;Target format: {target_format}&quot;)
+    print(f&quot;Additional options: {options}&quot;)
+
+configure_etl(&quot;Daily_Clean&quot;, &quot;s3://b/file1.csv&quot;, &quot;s3://b/file2.csv&quot;, target_format=&quot;orc&quot;, partition_by=&quot;date&quot;)
+# Sources: (&#39;s3://b/file1.csv&#39;, &#39;s3://b/file2.csv&#39;)
+# Additional options: {&#39;partition_by&#39;: &#39;date&#39;}
+</code></pre>
+<h2 id="2-variable-scope-and-the-legb-rule">2. Variable Scope and the LEGB Rule</h2><p>When accessing a variable inside a function, Python searches scopes in this specific order:</p>
+<ol>
+<li><strong>L</strong>ocal: Defined inside the current function.</li>
+<li><strong>E</strong>nclosing: Defined in outer nested/enclosing functions.</li>
+<li><strong>G</strong>lobal: Defined at the module level.</li>
+<li><strong>B</strong>uilt-in: Python&#39;s pre-loaded keywords (like <code>len</code>, <code>int</code>, etc.).</li>
+</ol>
+<p>If Python cannot find the variable in any of these scopes, it throws a <code>NameError</code>.</p>
+<pre><code class="language-python">x = &quot;global_var&quot;
+
+def outer():
+    x = &quot;enclosing_var&quot;
+    def inner():
+        x = &quot;local_var&quot;
+        print(x)  # Prints &quot;local_var&quot;
+    inner()
+
+outer()
+</code></pre>
+<hr>
+<h1 id="robust-exception-handling-chaining">Robust Exception Handling &amp; Chaining</h1><p>An ETL pipeline must handle transient errors (network timeouts, disk full, syntax changes) gracefully.</p>
+<h3 id="complete-try-except-else-finally-flow">Complete try-except-else-finally Flow</h3><ul>
+<li><strong><code>else</code>:</strong> Executes only if no exceptions were raised in the <code>try</code> block.</li>
+<li><strong><code>finally</code>:</strong> Executes <em>always</em>, regardless of whether an exception occurred, ensuring cleanup operations run.</li>
+</ul>
+<pre><code class="language-python">def ingest_log_file(file_path):
+    print(&quot;Initiating file ingestion...&quot;)
+    file_handle = None
+    try:
+        file_handle = open(file_path, &quot;r&quot;)
+        # Ingestion logic
+        records = [line.split(&quot;,&quot;) for line in file_handle]
+    except FileNotFoundError as err:
+        print(f&quot;Error: File {file_path} not found.&quot;)
+    except Exception as general_err:
+        print(f&quot;Unexpected processing error: {general_err}&quot;)
+    else:
+        print(f&quot;Successfully processed {len(records)} log entries.&quot;)
+    finally:
+        if file_handle:
+            file_handle.close()
+            print(&quot;Closed file handle successfully.&quot;)
+</code></pre>
+<h3 id="exception-chaining-raise-from">Exception Chaining (<code>raise ... from</code>)</h3><p>When catching a low-level error (like <code>ConnectionRefusedError</code>), you often want to raise a high-level domain error (like <code>DataPipelineExtractError</code>). If you do this directly, you risk losing the original stack trace.
+<strong>The Fix:</strong> Use <code>raise NewException from OldException</code> to link them.</p>
+<pre><code class="language-python">class DatabaseConnectionError(Exception):
+    &quot;&quot;&quot;Custom exception class for pipeline databases failures.&quot;&quot;&quot;
+    pass
+
+def query_database(query):
+    try:
+        # Simulate network failure
+        import socket
+        raise socket.timeout(&quot;Postgres socket connection timed out.&quot;)
+    except socket.timeout as err:
+        # Chain exceptions to preserve traceback diagnosis
+        raise DatabaseConnectionError(&quot;Failed to extract analytics data.&quot;) from err
+
+try:
+    query_database(&quot;SELECT * FROM events;&quot;)
+except DatabaseConnectionError as e:
+    print(f&quot;Captured: {e}&quot;)
+    # The traceback will explicitly show: 
+    # &quot;The above exception was the direct cause of the following exception...&quot;
+</code></pre>
+<hr>
+<h1 id="exercises-quiz">Exercises &amp; Quiz</h1><h3 id="question-1">Question 1</h3><p>What is the sorting requirement for using <code>itertools.groupby()</code>?</p>
+<ul>
+<li>A) The input must be sorted alphabetically by keys.</li>
+<li>B) The input dataset must be sorted by the grouping key before calling <code>groupby()</code>, because it only aggregates adjacent matching keys.</li>
+<li>C) No sorting is required.</li>
+<li>D) Only numbers can be sorted.</li>
+</ul>
+<p><em>Answer:</em> <strong>B</strong>. <code>groupby()</code> checks contiguous keys. If the dataset is not sorted, duplicate group keys will appear multiple times in the output.</p>
+<h3 id="question-2">Question 2</h3><p>What does <code>raise NewException from err</code> accomplish?</p>
+<ul>
+<li>A) It deletes the error history.</li>
+<li>B) It automatically logs the exception to S3.</li>
+<li>C) It implements exception chaining, linking the new exception to the original caught exception so both stack traces are available for debugging.</li>
+<li>D) It prevents the program from raising exceptions.</li>
+</ul>
+<p><em>Answer:</em> <strong>C</strong>. Exception chaining maintains traceback histories across exception boundary wrappers.</p>
+<hr>
+<h1 id="chapter-summary-checklist">Chapter Summary Checklist</h1><ul>
+<li>Can you write a custom class implementing the Iterator Protocol?</li>
+<li>How does <code>itertools.chain</code> improve memory over list concatenations?</li>
+<li>When would you implement <code>@functools.lru_cache</code>?</li>
+<li>How do you construct custom exception wrappers using <code>raise ... from</code>?</li>
+</ul>
+
+    </article>
+    
+    
+    <div class="subpage-complete-area">
+      <div class="subpage-complete-text">Finished reading this chapter? Mark it as complete to track your progress!</div>
+      <div class="checkbox-btn-wrapper">
+        <button class="theme-toggle-btn" id="subpage-complete-btn" onclick="toggleSubpageCompletion('ch-42')">
+          <span id="complete-status-icon">⏳</span>
+          <span id="complete-status-text">Mark as Complete</span>
+        </button>
+      </div>
+    </div>
+  
+    <div class="page-nav-footer">
+        <a href="01-Python-Basics-and-Data-Types.html" class="nav-footer-btn prev">
+          <span class="nav-footer-label">← Previous Chapter</span>
+          <span class="nav-footer-title">Python Basics & Core Data Structures</span>
+        </a>
+      
+        <a href="03-Object-Oriented-Programming.html" class="nav-footer-btn next">
+          <span class="nav-footer-label">Next Chapter →</span>
+          <span class="nav-footer-title">Object-Oriented Programming in Data Engineering</span>
+        </a>
+      </div>
+  </main>
+
+  <!-- KaTeX & Prism Scripts -->
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js" onload="initKaTeX()"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-core.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+  <script>
+    const pageId = 'ch-42';
+    let currentTheme = localStorage.getItem('theme') || 'dark';
+    
+    // Auto KaTeX setup
+    function initKaTeX() {
+      if (window.renderMathInElement) {
+        window.renderMathInElement(document.body, {
+          delimiters: [
+            {left: '$$', right: '$$', display: true},
+            {left: '\(', right: '\)', display: false},
+            {left: '$', right: '$', display: false}
+          ],
+          throwOnError : false
+        });
+      }
+    }
+
+    // Set Theme Toggler Content
+    const themeBtn = document.getElementById('theme-btn');
+    function updateThemeUI() {
+      themeBtn.innerHTML = currentTheme === 'dark' ? '🌙 Dark Mode' : '☀️ Light Mode';
+      const prismStyle = document.getElementById('prism-theme');
+      if (prismStyle) {
+        if (currentTheme === 'light') {
+          prismStyle.href = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css';
+        } else {
+          prismStyle.href = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css';
+        }
+      }
+    }
+    
+    themeBtn.addEventListener('click', () => {
+      currentTheme = currentTheme === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', currentTheme);
+      localStorage.setItem('theme', currentTheme);
+      updateThemeUI();
+    });
+    
+    updateThemeUI(); // Run immediately on load
+
+    // Copy action for code listings
+    function setupCodeBlocks() {
+      const codeBlocks = document.querySelectorAll('pre');
+      codeBlocks.forEach(block => {
+        const btn = document.createElement('button');
+        btn.className = 'copy-btn';
+        btn.innerText = 'Copy';
+        btn.onclick = () => {
+          const code = block.querySelector('code').innerText;
+          navigator.clipboard.writeText(code).then(() => {
+            btn.innerText = 'Copied!';
+            setTimeout(() => { btn.innerText = 'Copy'; }, 2000);
+          });
+        };
+        block.appendChild(btn);
+      });
+    }
+    setupCodeBlocks();
+
+    // Completion Status handling
+    function updateCompletionUI() {
+      const compBtn = document.getElementById('subpage-complete-btn');
+      if (!compBtn) return;
+      
+      const completed = JSON.parse(localStorage.getItem('completed_python_chapters') || '[]');
+      const isDone = completed.includes(pageId);
+      
+      const iconSpan = document.getElementById('complete-status-icon');
+      const textSpan = document.getElementById('complete-status-text');
+      
+      if (isDone) {
+        compBtn.style.backgroundColor = 'rgba(16, 185, 129, 0.15)';
+        compBtn.style.borderColor = '#10b981';
+        compBtn.style.color = '#10b981';
+        iconSpan.innerText = '✅';
+        textSpan.innerText = 'Completed';
+      } else {
+        compBtn.style.backgroundColor = 'var(--bg-primary)';
+        compBtn.style.borderColor = 'var(--border-color)';
+        compBtn.style.color = 'var(--text-primary)';
+        iconSpan.innerText = '⏳';
+        textSpan.innerText = 'Mark as Complete';
+      }
+    }
+
+    function toggleSubpageCompletion() {
+      let completed = JSON.parse(localStorage.getItem('completed_python_chapters') || '[]');
+      if (completed.includes(pageId)) {
+        completed = completed.filter(id => id !== pageId);
+      } else {
+        completed.push(pageId);
+      }
+      localStorage.setItem('completed_python_chapters', JSON.stringify(completed));
+      updateCompletionUI();
+    }
+    
+    updateCompletionUI();
+  </script>
+</body>
+</html>

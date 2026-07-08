@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Python Basics & Core Data Structures - SQL & Python Curriculum</title>
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  
+  <!-- KaTeX Math CSS -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+  
+  <!-- Prism.js Dark/Light CSS -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" id="prism-theme">
+  
+  <!-- Shared Style Sheet -->
+  <link rel="stylesheet" href="../../style.css">
+  
+  <script>
+    // Immediate script to prevent theme flash
+    (function() {
+      const theme = localStorage.getItem('theme') || 'dark';
+      document.documentElement.setAttribute('data-theme', theme);
+    })();
+  </script>
+</head>
+<body>
+  
+  <header class="site-header">
+    <div class="header-container">
+      <a href="../../index.html" class="back-link">← Back to Curriculum Directory</a>
+      <div class="header-actions">
+        <button class="theme-toggle-btn" id="theme-btn">🌙 Dark Mode</button>
+      </div>
+    </div>
+  </header>
+  
+  <main class="content-wrapper">
+    <article class="markdown-body">
+      <h1 id="chapter-1-python-basics-core-data-structures">Chapter 1: Python Basics &amp; Core Data Structures</h1><blockquote>
+<p><strong>Part:</strong> Python for Data Engineering</p>
+<p><strong>Chapter:</strong> 1</p>
+<p><strong>Difficulty:</strong> 🟢 Beginner</p>
+<p><strong>Estimated Reading Time:</strong> 35–45 minutes</p>
+<p><strong>Prerequisites:</strong> None</p>
+<p><strong>Target Audience:</strong> Data Engineers, Data Analysts, ETL Developers, Software Engineers transitioners</p>
+<p><strong>Version:</strong> 2.0</p>
+<p><strong>Last Updated:</strong> 2026-07-06</p>
+</blockquote>
+<hr>
+<h1 id="learning-objectives">Learning Objectives</h1><p>After completing this chapter, you will be able to:</p>
+<ul>
+<li>Explain Python&#39;s memory model, particularly the concept of <strong>mutability vs. immutability</strong>.</li>
+<li>Differentiate between <strong>shallow copy</strong> and <strong>deep copy</strong>, and recognize when to use each in data processing workflows.</li>
+<li>Compare memory allocations of lists vs. tuples using <code>sys.getsizeof</code> and choose the optimal one for high-volume storage.</li>
+<li>Optimize logging and path construction by benchmarking different string interpolation methods (f-strings, <code>.format()</code>, and <code>%</code>).</li>
+<li>Implement specialized data structures from the <code>collections</code> module (<code>defaultdict</code>, <code>Counter</code>, <code>namedtuple</code>) to write clean and memory-efficient ETL parsers.</li>
+<li>Clean malformed CSV fields using advanced list, set, and dictionary operations.</li>
+</ul>
+<hr>
+<h1 id="quick-revision">Quick Revision</h1><ul>
+<li><strong>Primitive Types:</strong> <code>int</code>, <code>float</code>, <code>bool</code>, <code>str</code>, <code>NoneType</code> (via <code>None</code>).</li>
+<li><strong>Mutable Objects:</strong> Objects whose state/content can be modified in place (e.g., <code>list</code>, <code>dict</code>, <code>set</code>).</li>
+<li><strong>Immutable Objects:</strong> Objects whose state cannot be changed after creation (e.g., <code>int</code>, <code>float</code>, <code>bool</code>, <code>str</code>, <code>tuple</code>). Modifying them creates a new object.</li>
+<li><strong>Lists (<code>list</code>):</strong> Ordered, mutable, indexed sequences. Best for ordered batches.</li>
+<li><strong>Tuples (<code>tuple</code>):</strong> Ordered, immutable, indexed sequences. More memory-efficient than lists. Ideal for database rows.</li>
+<li><strong>Dictionaries (<code>dict</code>):</strong> Key-value maps. Fast lookup (<span class="math-inline">\(O(1)\)</span>). Standard for JSON-like configs and records.</li>
+<li><strong>Sets (<code>set</code>):</strong> Unordered, mutable collections of unique, hashable items. Perfect for deduplication.</li>
+<li><strong>Shallow Copy (<code>copy()</code>):</strong> Copies the outer collection container, referencing the same internal objects.</li>
+<li><strong>Deep Copy (<code>copy.deepcopy()</code>):</strong> Recursively copies the entire structure, creating entirely new objects at all nesting levels.</li>
+<li><strong><code>collections</code> Module:</strong> Core extension module containing specialized containers such as <code>defaultdict</code> (automatic fallback values), <code>Counter</code> (item frequency maps), and <code>namedtuple</code> (tuples with named attributes).</li>
+</ul>
+<hr>
+<h1 id="mutability-vs-immutability-memory-footprint">Mutability vs. Immutability &amp; Memory Footprint</h1><p>Understanding mutability is crucial in Data Engineering, especially when processing records in parallel where side-effects can corrupt data.</p>
+<p>In Python, every value is an <strong>object</strong>. An object has:</p>
+<ol>
+<li>An <strong>Identity</strong> (its memory address, checked via <code>id(obj)</code>).</li>
+<li>A <strong>Type</strong> (checked via <code>type(obj)</code>).</li>
+<li>A <strong>Value</strong>.</li>
+</ol>
+<h3 id="immutable-types">Immutable Types</h3><p>Once created, an immutable object&#39;s value cannot change. If you try to modify it, Python creates a new object in memory.</p>
+<pre><code class="language-python"># Modifying a string creates a new string object
+x = &quot;data&quot;
+print(id(x))  # Example address: 140228392182064
+
+x += &quot;_engineering&quot;
+print(id(x))  # Example address: 140228392185712 (Different memory address!)
+</code></pre>
+<p>Common immutable types:</p>
+<ul>
+<li><code>int</code>, <code>float</code>, <code>complex</code></li>
+<li><code>str</code></li>
+<li><code>tuple</code></li>
+<li><code>bool</code></li>
+<li><code>bytes</code></li>
+<li><code>frozenset</code></li>
+</ul>
+<h3 id="mutable-types">Mutable Types</h3><p>Mutable objects can be modified in place. Their identity (<code>id</code>) remains unchanged.</p>
+<pre><code class="language-python"># Modifying a list alters it in place
+batch = [&quot;sales_202601.csv&quot;, &quot;sales_202602.csv&quot;]
+print(id(batch))  # Example address: 140228392110208
+
+batch.append(&quot;sales_202603.csv&quot;)
+print(id(batch))  # Example address: 140228392110208 (Same memory address!)
+</code></pre>
+<p>Common mutable types:</p>
+<ul>
+<li><code>list</code></li>
+<li><code>dict</code></li>
+<li><code>set</code></li>
+<li><code>bytearray</code></li>
+</ul>
+<div class="alert-box alert-warning">
+        <div class="alert-title">
+          <span class="alert-icon"></span>
+          WARNING
+        </div>
+        <div class="alert-content">Passing mutable objects (like lists or dictionaries) as default arguments in functions is a major anti-pattern. Because default arguments are evaluated once when the function is defined, modifications to the default argument persist across multiple function calls.</div>
+      </div>
+<hr>
+<h1 id="lists-vs-tuples-a-deep-dive-into-memory-and-speed">Lists vs. Tuples: A Deep Dive into Memory and Speed</h1><p>Data pipelines often store millions of temporary rows in memory before loading them to a warehouse. Understanding the structural differences between <code>list</code> and <code>tuple</code> can save gigabytes of RAM.</p>
+<h3 id="1-memory-overhead-comparison">1. Memory Overhead Comparison</h3><p>Lists are designed to be dynamic. To avoid resizing memory continuously when items are appended, Python overallocates memory space for lists (over-allocation). Tuples, being immutable, are allocated with the exact amount of memory needed.</p>
+<pre><code class="language-python">import sys
+
+# Create a list and tuple with identical elements
+my_list = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+my_tuple = (1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
+
+print(f&quot;List memory size: {sys.getsizeof(my_list)} bytes&quot;)   # Output: ~136 bytes
+print(f&quot;Tuple memory size: {sys.getsizeof(my_tuple)} bytes&quot;) # Output: ~120 bytes
+</code></pre>
+<p>When storing <span class="math-inline">\(10,000,000\)</span> database rows, this memory overhead can degrade performance and lead to host machine swapping.</p>
+<h3 id="2-allocation-speed">2. Allocation Speed</h3><p>Because tuples are immutable, they are allocated in a single, static block of memory. Furthermore, Python implements an internal optimization called <strong>recycling/caching</strong> for small tuples: when a tuple is deleted, its memory block is kept and reused for the next tuple instantiation, bypassing calls to the system allocator.</p>
+<hr>
+<h1 id="string-formatting-performance-for-log-pipelines">String Formatting &amp; Performance for Log Pipelines</h1><p>Logs are critical for troubleshooting failed ETL pipelines. In high-throughput streaming systems, formatting strings inside hot paths can introduce significant overhead. Let&#39;s compare the three formatting protocols:</p>
+<pre><code class="language-python"># 1. C-style formatting (Legacy)
+c_style = &quot;%s processed %d records&quot; % (&quot;Job_A&quot;, 1000)
+
+# 2. str.format() (Standard)
+str_format = &quot;{} processed {} records&quot;.format(&quot;Job_A&quot;, 1000)
+
+# 3. f-Strings (Modern, Python 3.6+)
+job, count = &quot;Job_A&quot;, 1000
+f_string = f&quot;{job} processed {count} records&quot;
+</code></pre>
+<h3 id="performance-benchmarks">Performance Benchmarks</h3><p>f-strings are evaluated at runtime as a series of bytecode instructions rather than parsing a format string template. This makes them significantly faster:</p>
+<table>
+<thead>
+<tr>
+<th align="left">Formatting Method</th>
+<th align="left">Relative Execution Time</th>
+<th align="left">Recommendation</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><strong>f-strings</strong></td>
+<td align="left"><span class="math-inline">\(1.0\times\)</span> (Fastest)</td>
+<td align="left">Use for all inline variables and logging.</td>
+</tr>
+<tr>
+<td align="left"><strong><code>str.format()</code></strong></td>
+<td align="left"><span class="math-inline">\(1.3\times - 1.5\times\)</span> slower</td>
+<td align="left">Use only when templates are loaded dynamically from files.</td>
+</tr>
+<tr>
+<td align="left"><strong><code>%</code> Formatting</strong></td>
+<td align="left"><span class="math-inline">\(1.2\times - 1.4\times\)</span> slower</td>
+<td align="left">Avoid in modern codebases.</td>
+</tr>
+</tbody></table>
+<hr>
+<h1 id="primitive-data-types-methods">Primitive Data Types &amp; Methods</h1><h2 id="1-strings-str">1. Strings (<code>str</code>)</h2><p>Strings are sequences of Unicode characters. They are immutable.</p>
+<h3 id="essential-methods-for-data-wrangling">Essential Methods for Data Wrangling:</h3><ul>
+<li><code>strip()</code>: Removes leading/trailing whitespace. Essential for cleaning raw CSV inputs.</li>
+<li><code>split(sep)</code>: Tokenizes a string into a list based on a delimiter.</li>
+<li><code>join(iterable)</code>: Joins elements of an iterable into a single string.</li>
+<li><code>replace(old, new)</code>: Replaces occurrences of a substring.</li>
+<li><code>startswith(prefix)</code> / <code>endswith(suffix)</code>: Used to filter file formats or check patterns.</li>
+<li><code>lower()</code> / <code>upper()</code>: Normalizes casings (e.g., matching email addresses).</li>
+</ul>
+<pre><code class="language-python"># Cleaning raw column names
+raw_col = &quot;  Transaction_ID  \n&quot;
+clean_col = raw_col.strip().lower()
+print(clean_col)  # &quot;transaction_id&quot;
+
+# Extracting file extension
+filename = &quot;s3://my-bucket/lake/users_active.parquet&quot;
+if filename.endswith(&quot;.parquet&quot;):
+    print(&quot;Process with PySpark Parquet Reader&quot;)
+
+# Reconstructing CSV lines
+record = [&quot;101&quot;, &quot;John Doe&quot;, &quot;Engineer&quot;]
+csv_line = &quot;,&quot;.join(record)
+print(csv_line)  # &quot;101,John Doe,Engineer&quot;
+</code></pre>
+<h2 id="2-numbers-int-float">2. Numbers (<code>int</code>, <code>float</code>)</h2><p>Data engineering handles numeric transformations, metrics calculation, and indices.</p>
+<ul>
+<li>Division (<code>/</code>) always returns a <code>float</code> in Python 3.</li>
+<li>Floor division (<code>//</code>) returns an integer (rounded down).</li>
+<li>Modulo (<code>%</code>) returns the remainder, useful for chunking or batching indexes.</li>
+</ul>
+<pre><code class="language-python">chunk_size = 1000
+total_records = 5300
+batches_needed = (total_records + chunk_size - 1) // chunk_size  # Ceil division
+print(batches_needed)  # 6
+</code></pre>
+<h2 id="3-nonetype-none">3. NoneType (<code>None</code>)</h2><p><code>None</code> is the equivalent of database <code>NULL</code> or missing/empty values.</p>
+<ul>
+<li>Checking for <code>None</code> should always use identity comparison <code>is</code> or <code>is not</code>, rather than equality operators (<code>==</code>).</li>
+</ul>
+<pre><code class="language-python">db_response = None
+if db_response is None:
+    print(&quot;No active records found. Retrying database connection...&quot;)
+</code></pre>
+<hr>
+<h1 id="collection-data-types">Collection Data Types</h1><h2 id="1-lists-list">1. Lists (<code>list</code>)</h2><p>Lists are ordered, mutable, and allow duplicate elements.</p>
+<h3 id="performance-profile">Performance Profile:</h3><ul>
+<li><strong>Append / Pop from end:</strong> <span class="math-inline">\(O(1)\)</span></li>
+<li><strong>Insert / Remove / Pop from front/middle:</strong> <span class="math-inline">\(O(n)\)</span></li>
+<li><strong>Search (in):</strong> <span class="math-inline">\(O(n)\)</span></li>
+<li><strong>Access by index:</strong> <span class="math-inline">\(O(1)\)</span></li>
+</ul>
+<h3 id="core-methods">Core Methods:</h3><ul>
+<li><code>append(item)</code>: Adds an item to the end.</li>
+<li><code>extend(iterable)</code>: Appends elements from another iterable (concatenation).</li>
+<li><code>insert(index, item)</code>: Inserts item at index.</li>
+<li><code>remove(value)</code>: Removes the first occurrence of <code>value</code>.</li>
+<li><code>pop([index])</code>: Removes and returns the item at the given index (default is the last).</li>
+<li><code>sort(key=..., reverse=...)</code>: Sorts the list in place.</li>
+<li><code>reverse()</code>: Reverses the elements in place.</li>
+</ul>
+<pre><code class="language-python"># Batch accumulation
+batch_records = []
+batch_records.append({&quot;id&quot;: 1, &quot;status&quot;: &quot;PENDING&quot;})
+batch_records.extend([{&quot;id&quot;: 2, &quot;status&quot;: &quot;SUCCESS&quot;}, {&quot;id&quot;: 3, &quot;status&quot;: &quot;FAIL&quot;}])
+
+# Slicing syntax: list[start:stop:step]
+# Get the first two records
+print(batch_records[:2])
+# Reverse list
+reversed_batch = batch_records[::-1]
+</code></pre>
+<h2 id="2-tuples-tuple">2. Tuples (<code>tuple</code>)</h2><p>Tuples are ordered, immutable sequences.</p>
+<h3 id="why-tuples-in-data-engineering">Why Tuples in Data Engineering?</h3><ol>
+<li><strong>Safety:</strong> They prevent accidental write-over in multi-threaded workflows.</li>
+<li><strong>Hashability:</strong> If a tuple contains only immutable elements, it is hashable. This means it can be used as a key in a dictionary or added to a set (unlike lists).</li>
+<li><strong>Database Mapping:</strong> Commonly represent structured database records returned by database cursors (e.g., <code>psycopg2</code>).</li>
+</ol>
+<pre><code class="language-python"># Unpacking query results
+row = (4092, &quot;USD&quot;, 1250.75, &quot;2026-07-06&quot;)
+tx_id, currency, amount, date = row
+print(f&quot;Transaction {tx_id} processed: {amount} {currency}&quot;)
+
+# Tuples as composite dictionary keys (e.g., grouping by composite key)
+grouped_data = {}
+grouped_data[(&quot;North America&quot;, &quot;SaaS&quot;)] = 98000.00
+grouped_data[(&quot;Europe&quot;, &quot;SaaS&quot;)] = 43000.00
+</code></pre>
+<h2 id="3-dictionaries-dict">3. Dictionaries (<code>dict</code>)</h2><p>Dictionaries are collections of key-value pairs. From Python 3.7+, they maintain insertion order.</p>
+<h3 id="performance-profile">Performance Profile:</h3><ul>
+<li><strong>Lookup / Insertion / Deletion:</strong> Average <span class="math-inline">\(O(1)\)</span> (constant time).</li>
+</ul>
+<h3 id="core-methods">Core Methods:</h3><ul>
+<li><code>keys()</code>: Returns a view of dict keys.</li>
+<li><code>values()</code>: Returns a view of dict values.</li>
+<li><code>items()</code>: Returns a view of <code>(key, value)</code> tuples.</li>
+<li><code>get(key, default)</code>: Safely fetches a value. If the key is missing, returns the <code>default</code> instead of raising a <code>KeyError</code>.</li>
+<li><code>setdefault(key, default)</code>: Returns key&#39;s value if present. If not, inserts the key with the <code>default</code> value. Very useful for grouping.</li>
+<li><code>update(other_dict)</code>: Merges another dictionary in place (overwriting matching keys).</li>
+<li><code>pop(key[, default])</code>: Removes the key and returns its value.</li>
+</ul>
+<pre><code class="language-python"># Handling missing data columns safely
+record = {&quot;user_id&quot;: 9821, &quot;signup_channel&quot;: None}
+
+# Safely access sign-up channel with fallback
+channel = record.get(&quot;signup_channel&quot;, &quot;Organic&quot;) or &quot;Organic&quot;
+# Safely access non-existent key
+tier = record.get(&quot;subscription_tier&quot;, &quot;Free&quot;)
+
+# Grouping list of records using setdefault
+records = [
+    {&quot;region&quot;: &quot;US&quot;, &quot;amount&quot;: 100},
+    {&quot;region&quot;: &quot;EU&quot;, &quot;amount&quot;: 200},
+    {&quot;region&quot;: &quot;US&quot;, &quot;amount&quot;: 150},
+]
+regional_totals = {}
+for r in records:
+    regional_totals.setdefault(r[&quot;region&quot;], []).append(r[&quot;amount&quot;])
+print(regional_totals)  # {&#39;US&#39;: [100, 150], &#39;EU&#39;: [200]}
+</code></pre>
+<h2 id="4-sets-set">4. Sets (<code>set</code>)</h2><p>Sets are unordered, mutable collections of unique, hashable elements.</p>
+<h3 id="performance-profile">Performance Profile:</h3><ul>
+<li><strong>Lookup (in) / Addition / Removal:</strong> Average <span class="math-inline">\(O(1)\)</span>.</li>
+</ul>
+<h3 id="core-methods-operators">Core Methods &amp; Operators:</h3><ul>
+<li><code>add(item)</code>: Adds an element.</li>
+<li><code>remove(item)</code>: Removes item; raises <code>KeyError</code> if not found.</li>
+<li><code>discard(item)</code>: Removes item; does NOT raise an error if missing.</li>
+<li><code>union(other)</code> or <code>|</code>: Combines unique items from both sets.</li>
+<li><code>intersection(other)</code> or <code>&amp;</code>: Returns common items.</li>
+<li><code>difference(other)</code> or <code>-</code>: Returns elements in this set but not the other.</li>
+<li><code>symmetric_difference(other)</code> or <code>^</code>: Returns items in either set, but not both.</li>
+</ul>
+<pre><code class="language-python"># De-duplicating ID columns
+raw_user_ids = [101, 102, 101, 103, 102, 104]
+unique_users = set(raw_user_ids)
+print(unique_users)  # {101, 102, 103, 104}
+
+# Schema validation: checking if extra columns are present
+expected_schema = {&quot;id&quot;, &quot;name&quot;, &quot;email&quot;, &quot;created_at&quot;}
+actual_schema = {&quot;id&quot;, &quot;name&quot;, &quot;email&quot;, &quot;ip_address&quot;, &quot;session_id&quot;}
+
+extra_columns = actual_schema - expected_schema
+missing_columns = expected_schema - actual_schema
+print(f&quot;Extra cols: {extra_columns}&quot;)      # {&#39;ip_address&#39;, &#39;session_id&#39;}
+print(f&quot;Missing cols: {missing_columns}&quot;)  # {&#39;created_at&#39;}
+</code></pre>
+<hr>
+<h1 id="the-collections-module-advanced-structures">The Collections Module: Advanced Structures</h1><p>Python&#39;s standard <code>collections</code> module provides container alternatives with improved performance and design patterns.</p>
+<h3 id="1-defaultdict">1. <code>defaultdict</code></h3><p>A <code>defaultdict</code> behaves like a standard dictionary but calls a factory function to provide default values when accessing non-existent keys, eliminating manual <code>if key not in dict</code> checks.</p>
+<pre><code class="language-python">from collections import defaultdict
+
+# Setup defaultdict with list factory
+user_events = defaultdict(list)
+
+# Safely append without checking if user_id exists
+user_events[101].append(&quot;login&quot;)
+user_events[101].append(&quot;click_ad&quot;)
+user_events[102].append(&quot;login&quot;)
+
+print(dict(user_events))  # {101: [&#39;login&#39;, &#39;click_ad&#39;], 102: [&#39;login&#39;]}
+</code></pre>
+<h3 id="2-counter">2. <code>Counter</code></h3><p>A <code>Counter</code> is a dictionary subclass designed to count hashable objects. It maps items to their occurrence count.</p>
+<pre><code class="language-python">from collections import Counter
+
+log_statuses = [&quot;SUCCESS&quot;, &quot;SUCCESS&quot;, &quot;FAIL&quot;, &quot;SUCCESS&quot;, &quot;FAIL&quot;, &quot;WARN&quot;]
+status_counts = Counter(log_statuses)
+
+print(status_counts)               # Counter({&#39;SUCCESS&#39;: 3, &#39;FAIL&#39;: 2, &#39;WARN&#39;: 1})
+print(status_counts.most_common(1)) # [(&#39;SUCCESS&#39;, 3)]
+</code></pre>
+<h3 id="3-namedtuple">3. <code>namedtuple</code></h3><p><code>namedtuple</code> returns a subclass of tuple that allows accessing elements by field name (e.g. <code>row.user_id</code>) in addition to indices, serving as an immutable, lightweight record template.</p>
+<pre><code class="language-python">from collections import namedtuple
+
+# Define Row schema
+UserRow = namedtuple(&quot;UserRow&quot;, [&quot;user_id&quot;, &quot;email&quot;, &quot;country&quot;])
+
+# Instantiate row
+row = UserRow(user_id=402, email=&quot;user@domain.com&quot;, country=&quot;CA&quot;)
+
+print(row.user_id)  # Access by field name (402)
+print(row[1])       # Access by index (&quot;user@domain.com&quot;)
+</code></pre>
+<hr>
+<h1 id="memory-management-shallow-copy-vs-deep-copy">Memory Management: Shallow Copy vs. Deep Copy</h1><p>Because variable names in Python are references (labels pointing to memory addresses), copying mutable objects requires care.</p>
+<pre><code class="language-python"># Reference assignment (not a copy!)
+list_a = [1, 2, [3, 4]]
+list_b = list_a  # Both variables point to the exact same list object in memory
+list_b[0] = 99
+print(list_a)    # [99, 2, [3, 4]] - Original list was modified!
+</code></pre>
+<h3 id="shallow-copy">Shallow Copy</h3><p>A shallow copy creates a new container object, but populates it with <em>references</em> to the original nested objects.
+Methods to shallow copy: <code>list.copy()</code>, <code>dict.copy()</code>, <code>copy.copy(x)</code>.</p>
+<pre><code class="language-python">import copy
+
+list_a = [1, 2, [3, 4]]
+list_shallow = copy.copy(list_a)
+
+# Modify top-level item (integer is immutable)
+list_shallow[0] = 99
+print(list_a)        # [1, 2, [3, 4]] - Original outer container is unchanged.
+
+# Modify nested mutable item
+list_shallow[2][0] = 999
+print(list_a)        # [1, 2, [999, 4]] - Original nested list changed!
+</code></pre>
+<h3 id="deep-copy">Deep Copy</h3><p>A deep copy recursively duplicates the outer container <em>and</em> all nested mutable elements, allocating new memory spaces.
+Method: <code>copy.deepcopy(x)</code>.</p>
+<pre><code class="language-python">import copy
+
+list_a = [1, 2, [3, 4]]
+list_deep = copy.deepcopy(list_a)
+
+list_deep[2][0] = 999
+print(list_a)     # [1, 2, [3, 4]] - Original is completely untouched!
+</code></pre>
+<div class="alert-box alert-important">
+        <div class="alert-title">
+          <span class="alert-icon"></span>
+          IMPORTANT
+        </div>
+        <div class="alert-content">When mutating config parameters or database schemas represented as nested dicts (e.g. <code>{ &quot;db&quot;: { &quot;host&quot;: &quot;localhost&quot;, &quot;port&quot;: 5432 } }</code>), always use a <code>deepcopy</code> if you need to create a template copy for modification, avoiding leakage back into global parameters.</div>
+      </div>
+<hr>
+<h1 id="enterprise-ingestion-parser-example">Enterprise Ingestion Parser Example</h1><p>Let&#39;s combine these concepts into a practical data engineering script: parsing raw CSV text rows, cleaning formatting anomalies, and aggregating log events.</p>
+<pre><code class="language-python">from collections import defaultdict, namedtuple
+import csv
+
+# Raw CSV content simulate
+raw_csv_data = &quot;&quot;&quot;id,username,active_status
+101,  alice_dev ,true
+102, bob_qa,false
+103, charlie_prod,  TRUE
+104,  david_eng,
+&quot;&quot;&quot;
+
+# Schema mapping
+CleanRecord = namedtuple(&quot;CleanRecord&quot;, [&quot;id&quot;, &quot;username&quot;, &quot;is_active&quot;])
+
+def parse_and_clean_csv(raw_text):
+    clean_records = []
+    lines = raw_text.strip().split(&quot;\n&quot;)
+    reader = csv.reader(lines)
+    
+    # Skip Header
+    header = next(reader)
+    
+    for row in reader:
+        # Prevent index out of bounds on empty lines
+        if not row or len(row) &lt; 3:
+            continue
+            
+        # Parse fields
+        raw_id, raw_name, raw_active = row
+        
+        # Clean formatting
+        record_id = int(raw_id.strip())
+        username = raw_name.strip().lower()
+        
+        # Normalize boolean fields
+        active_clean = raw_active.strip().upper()
+        is_active = active_clean == &quot;TRUE&quot;
+        
+        # Add to collection
+        clean_records.append(CleanRecord(record_id, username, is_active))
+        
+    return clean_records
+
+parsed_data = parse_and_clean_csv(raw_csv_data)
+for record in parsed_data:
+    print(f&quot;Record {record.id}: name={record.username}, active={record.is_active}&quot;)
+</code></pre>
+<hr>
+<h1 id="exercises-quiz">Exercises &amp; Quiz</h1><h3 id="question-1">Question 1</h3><p>What is the output of the following code snippet?</p>
+<pre><code class="language-python">x = (1, 2, [3, 4])
+x[2].append(5)
+print(x)
+</code></pre>
+<ul>
+<li>A) Raises a <code>TypeError</code> because tuples are immutable.</li>
+<li>B) <code>(1, 2, [3, 4])</code></li>
+<li>C) <code>(1, 2, [3, 4, 5])</code></li>
+<li>D) <code>(1, 2, 5)</code></li>
+</ul>
+<p><em>Answer:</em> <strong>C</strong>. Although the tuple is immutable (its container structure cannot point to different objects), the object at index <code>2</code> is a mutable <code>list</code>. The list itself can be altered in-place.</p>
+<h3 id="question-2">Question 2</h3><p>You are building an ETL script that loads a nested configuration dictionary. If you want to modify settings for a test database instance without altering the production database config template, which copy method should you use?</p>
+<ul>
+<li>A) Direct assignment (<code>test_cfg = prod_cfg</code>)</li>
+<li>B) Shallow copy (<code>test_cfg = prod_cfg.copy()</code>)</li>
+<li>C) Deep copy (<code>import copy; test_cfg = copy.deepcopy(prod_cfg)</code>)</li>
+<li>D) String conversion (<code>test_cfg = str(prod_cfg)</code>)</li>
+</ul>
+<p><em>Answer:</em> <strong>C</strong>. Direct assignment and shallow copy would propagate nested dictionary mutations back to <code>prod_cfg</code>.</p>
+<hr>
+<h1 id="chapter-summary-checklist">Chapter Summary Checklist</h1><ul>
+<li>Can you explain why tuples have lower memory overhead than lists in Python?</li>
+<li>Why do f-strings execute faster than calling <code>.format()</code>?</li>
+<li>How does <code>defaultdict</code> simplify writing metrics trackers?</li>
+<li>What are the risks of using a shallow copy on nested dictionary settings?</li>
+</ul>
+
+    </article>
+    
+    
+    <div class="subpage-complete-area">
+      <div class="subpage-complete-text">Finished reading this chapter? Mark it as complete to track your progress!</div>
+      <div class="checkbox-btn-wrapper">
+        <button class="theme-toggle-btn" id="subpage-complete-btn" onclick="toggleSubpageCompletion('ch-41')">
+          <span id="complete-status-icon">⏳</span>
+          <span id="complete-status-text">Mark as Complete</span>
+        </button>
+      </div>
+    </div>
+  
+    <div class="page-nav-footer"><div></div>
+        <a href="02-Control-Flow-and-Functions.html" class="nav-footer-btn next">
+          <span class="nav-footer-label">Next Chapter →</span>
+          <span class="nav-footer-title">Control Flow, Comprehensions & Functions</span>
+        </a>
+      </div>
+  </main>
+
+  <!-- KaTeX & Prism Scripts -->
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js" onload="initKaTeX()"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-core.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+  <script>
+    const pageId = 'ch-41';
+    let currentTheme = localStorage.getItem('theme') || 'dark';
+    
+    // Auto KaTeX setup
+    function initKaTeX() {
+      if (window.renderMathInElement) {
+        window.renderMathInElement(document.body, {
+          delimiters: [
+            {left: '$$', right: '$$', display: true},
+            {left: '\(', right: '\)', display: false},
+            {left: '$', right: '$', display: false}
+          ],
+          throwOnError : false
+        });
+      }
+    }
+
+    // Set Theme Toggler Content
+    const themeBtn = document.getElementById('theme-btn');
+    function updateThemeUI() {
+      themeBtn.innerHTML = currentTheme === 'dark' ? '🌙 Dark Mode' : '☀️ Light Mode';
+      const prismStyle = document.getElementById('prism-theme');
+      if (prismStyle) {
+        if (currentTheme === 'light') {
+          prismStyle.href = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css';
+        } else {
+          prismStyle.href = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css';
+        }
+      }
+    }
+    
+    themeBtn.addEventListener('click', () => {
+      currentTheme = currentTheme === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', currentTheme);
+      localStorage.setItem('theme', currentTheme);
+      updateThemeUI();
+    });
+    
+    updateThemeUI(); // Run immediately on load
+
+    // Copy action for code listings
+    function setupCodeBlocks() {
+      const codeBlocks = document.querySelectorAll('pre');
+      codeBlocks.forEach(block => {
+        const btn = document.createElement('button');
+        btn.className = 'copy-btn';
+        btn.innerText = 'Copy';
+        btn.onclick = () => {
+          const code = block.querySelector('code').innerText;
+          navigator.clipboard.writeText(code).then(() => {
+            btn.innerText = 'Copied!';
+            setTimeout(() => { btn.innerText = 'Copy'; }, 2000);
+          });
+        };
+        block.appendChild(btn);
+      });
+    }
+    setupCodeBlocks();
+
+    // Completion Status handling
+    function updateCompletionUI() {
+      const compBtn = document.getElementById('subpage-complete-btn');
+      if (!compBtn) return;
+      
+      const completed = JSON.parse(localStorage.getItem('completed_python_chapters') || '[]');
+      const isDone = completed.includes(pageId);
+      
+      const iconSpan = document.getElementById('complete-status-icon');
+      const textSpan = document.getElementById('complete-status-text');
+      
+      if (isDone) {
+        compBtn.style.backgroundColor = 'rgba(16, 185, 129, 0.15)';
+        compBtn.style.borderColor = '#10b981';
+        compBtn.style.color = '#10b981';
+        iconSpan.innerText = '✅';
+        textSpan.innerText = 'Completed';
+      } else {
+        compBtn.style.backgroundColor = 'var(--bg-primary)';
+        compBtn.style.borderColor = 'var(--border-color)';
+        compBtn.style.color = 'var(--text-primary)';
+        iconSpan.innerText = '⏳';
+        textSpan.innerText = 'Mark as Complete';
+      }
+    }
+
+    function toggleSubpageCompletion() {
+      let completed = JSON.parse(localStorage.getItem('completed_python_chapters') || '[]');
+      if (completed.includes(pageId)) {
+        completed = completed.filter(id => id !== pageId);
+      } else {
+        completed.push(pageId);
+      }
+      localStorage.setItem('completed_python_chapters', JSON.stringify(completed));
+      updateCompletionUI();
+    }
+    
+    updateCompletionUI();
+  </script>
+</body>
+</html>

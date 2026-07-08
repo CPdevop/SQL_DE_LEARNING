@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Workflow Orchestration with Apache Airflow - SQL & Python Curriculum</title>
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  
+  <!-- KaTeX Math CSS -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+  
+  <!-- Prism.js Dark/Light CSS -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" id="prism-theme">
+  
+  <!-- Shared Style Sheet -->
+  <link rel="stylesheet" href="../../style.css">
+  
+  <script>
+    // Immediate script to prevent theme flash
+    (function() {
+      const theme = localStorage.getItem('theme') || 'dark';
+      document.documentElement.setAttribute('data-theme', theme);
+    })();
+  </script>
+</head>
+<body>
+  
+  <header class="site-header">
+    <div class="header-container">
+      <a href="../../index.html" class="back-link">← Back to Curriculum Directory</a>
+      <div class="header-actions">
+        <button class="theme-toggle-btn" id="theme-btn">🌙 Dark Mode</button>
+      </div>
+    </div>
+  </header>
+  
+  <main class="content-wrapper">
+    <article class="markdown-body">
+      <h1 id="chapter-6-workflow-orchestration-with-apache-airflow">Chapter 6: Workflow Orchestration with Apache Airflow</h1><blockquote>
+<p><strong>Part:</strong> Python for Data Engineering</p>
+<p><strong>Chapter:</strong> 6</p>
+<p><strong>Difficulty:</strong> 🟡 Intermediate</p>
+<p><strong>Estimated Reading Time:</strong> 45–60 minutes</p>
+<p><strong>Prerequisites:</strong> Chapters 1–3</p>
+<p><strong>Target Audience:</strong> Data Engineers, DevOps Engineers, Analytics Engineers</p>
+<p><strong>Version:</strong> 2.0</p>
+<p><strong>Last Updated:</strong> 2026-07-06</p>
+</blockquote>
+<hr>
+<h1 id="learning-objectives">Learning Objectives</h1><p>After completing this chapter, you will be able to:</p>
+<ul>
+<li>Compare and configure Airflow&#39;s Executor architectures (<strong>Celery</strong>, <strong>Kubernetes</strong>, <strong>Local</strong>, <strong>Sequential</strong>).</li>
+<li>Design complex workflows using the <strong><code>BranchPythonOperator</code></strong> to execute tasks dynamically.</li>
+<li>Control task execution behaviors using custom <strong>Trigger Rules</strong> (e.g. <code>all_done</code>, <code>one_failed</code>).</li>
+<li>Author workflow DAGs using standard parameters (e.g. <code>start_date</code>, <code>schedule_interval</code>, <code>catchup</code>).</li>
+<li>Use standard Operators (<code>PythonOperator</code>, <code>BashOperator</code>) and connect task dependencies.</li>
+<li>Build modern data-sharing DAGs using the <strong>TaskFlow API</strong> and <code>@task</code> decorators.</li>
+<li>Design <strong>idempotent</strong> workflows that can be run repeatedly without corrupting datasets.</li>
+<li>Secure connection strings using Airflow Connections and Variables.</li>
+</ul>
+<hr>
+<h1 id="quick-revision">Quick Revision</h1><ul>
+<li><strong>DAG (Directed Acyclic Graph):</strong> A collection of all tasks you want to run, organized in a way that reflects their relationships and dependencies.</li>
+<li><strong>Executor:</strong> The mechanism that determines <em>how</em> and <em>where</em> tasks are executed.</li>
+<li><strong><code>BranchPythonOperator</code>:</strong> An operator that runs a Python function to decide which task path to execute next.</li>
+<li><strong>Trigger Rule:</strong> Setting that determines when a downstream task runs based on its parents&#39; statuses (defaults to <code>all_success</code>).</li>
+<li><strong>Idempotency:</strong> A design principle where running a pipeline multiple times with the same input parameters yields the exact same state, preventing duplicate records.</li>
+</ul>
+<hr>
+<h1 id="airflow-executor-architectures">Airflow Executor Architectures</h1><p>Airflow&#39;s scheduler delegates task execution to the configured <strong>Executor</strong>. Choosing the right executor is critical when moving from development to production.</p>
+<table>
+<thead>
+<tr>
+<th align="left">Executor</th>
+<th align="left">Database Backend</th>
+<th align="left">Concurrency Profile</th>
+<th align="left">Production Fit</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><strong>Sequential</strong></td>
+<td align="left">SQLite (Default)</td>
+<td align="left">Single task at a time (Sequential)</td>
+<td align="left">❌ Development only. SQLite locks during concurrent writes.</td>
+</tr>
+<tr>
+<td align="left"><strong>Local</strong></td>
+<td align="left">PostgreSQL / MySQL</td>
+<td align="left">Multi-threaded concurrency on a single machine</td>
+<td align="left">⚠️ Small production loads. Limited by the CPU/RAM of the scheduler node.</td>
+</tr>
+<tr>
+<td align="left"><strong>Celery</strong></td>
+<td align="left">PostgreSQL / Redis</td>
+<td align="left">Distributed tasks sent to permanent Celery worker nodes</td>
+<td align="left">Large enterprise loads. Handles steady, predictable scaling.</td>
+</tr>
+<tr>
+<td align="left"><strong>Kubernetes</strong></td>
+<td align="left">PostgreSQL</td>
+<td align="left">Distributed tasks spun up as individual Kubernetes Pods on-the-fly</td>
+<td align="left">🚀 Elastic scaling. Zero-resource idle costs. Perfect for containerized tasks.</td>
+</tr>
+</tbody></table>
+<hr>
+<h1 id="dynamic-task-routing-trigger-rules">Dynamic Task Routing &amp; Trigger Rules</h1><p>Data pipelines often need to branch. For example, if a database health check fails, the pipeline should route to an alert task and skip the rest of the ETL pipeline.</p>
+<h2 id="1-branching-with-branchpythonoperator">1. Branching with <code>BranchPythonOperator</code></h2><p>The <code>BranchPythonOperator</code> evaluates a python function that returns the <code>task_id</code> (or list of <code>task_ids</code>) of the task(s) to run next. All other paths are set to the <code>skipped</code> state.</p>
+<pre><code class="language-python">from airflow import DAG
+from airflow.operators.python import PythonOperator, BranchPythonOperator
+from airflow.operators.empty import EmptyOperator
+from datetime import datetime
+
+default_args = {&quot;start_date&quot;: datetime(2026, 7, 1)}
+
+def check_new_data():
+    # Simulate API count check
+    new_records_count = 50
+    if new_records_count &gt; 0:
+        return &quot;run_extraction_task&quot;  # Target task ID to branch to
+    return &quot;skip_pipeline_task&quot;
+
+with DAG(&quot;branching_etl_flow&quot;, default_args=default_args, schedule_interval=None) as dag:
+
+    # Branch task
+    task_branch = BranchPythonOperator(
+        task_id=&quot;check_records_count&quot;,
+        python_callable=check_new_data
+    )
+
+    # Path A: Run ETL
+    task_extract = EmptyOperator(task_id=&quot;run_extraction_task&quot;)
+    task_transform = EmptyOperator(task_id=&quot;run_transformation_task&quot;)
+
+    # Path B: Skip
+    task_skip = EmptyOperator(task_id=&quot;skip_pipeline_task&quot;)
+
+    # Connect dependencies
+    task_branch &gt;&gt; [task_extract, task_skip]
+    task_extract &gt;&gt; task_transform
+</code></pre>
+<h2 id="2-trigger-rules">2. Trigger Rules</h2><p>By default, downstream tasks only execute if all parent tasks succeed (<code>all_success</code>). Airflow provides <strong>Trigger Rules</strong> to modify this behavior (e.g. running cleanup tasks even if parent tasks fail).</p>
+<table>
+<thead>
+<tr>
+<th align="left">Trigger Rule</th>
+<th align="left">Execution Condition</th>
+<th align="left">Common Use Case</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><strong><code>all_success</code></strong> (Default)</td>
+<td align="left">All parent tasks completed successfully.</td>
+<td align="left">Standard ETL steps.</td>
+</tr>
+<tr>
+<td align="left"><strong><code>all_done</code></strong></td>
+<td align="left">All parent tasks completed, regardless of status (success/failed/skipped).</td>
+<td align="left">Cleanup tasks (e.g. turning off server, closing files).</td>
+</tr>
+<tr>
+<td align="left"><strong><code>one_failed</code></strong></td>
+<td align="left">At least one parent task failed.</td>
+<td align="left">Triggering immediate pager alerts.</td>
+</tr>
+<tr>
+<td align="left"><strong><code>one_success</code></strong></td>
+<td align="left">At least one parent task succeeded.</td>
+<td align="left">Alternate source routing.</td>
+</tr>
+<tr>
+<td align="left"><strong><code>none_failed_min_one_success</code></strong></td>
+<td align="left">All parents completed without failure, and at least one succeeded.</td>
+<td align="left">Branching joins.</td>
+</tr>
+</tbody></table>
+<pre><code class="language-python"># Task running regardless of parent success status (for cleanup)
+cleanup_temp_files = EmptyOperator(
+    task_id=&quot;cleanup_temp_files&quot;,
+    trigger_rule=&quot;all_done&quot;,
+    dag=dag
+)
+</code></pre>
+<hr>
+<h1 id="authoring-dags-dependency-management">Authoring DAGs &amp; Dependency Management</h1><pre><code class="language-python">from datetime import datetime, timedelta
+from airflow import DAG
+from airflow.operators.bash import BashOperator
+from airflow.operators.python import PythonOperator
+
+# Default arguments applied to all tasks in this DAG
+default_args = {
+    &quot;owner&quot;: &quot;data_team&quot;,
+    &quot;depends_on_past&quot;: False,
+    &quot;email_on_failure&quot;: True,
+    &quot;email&quot;: [&quot;alerts@company.com&quot;],
+    &quot;retries&quot;: 2,
+    &quot;retry_delay&quot;: timedelta(minutes=5),
+}
+
+def print_hello():
+    print(&quot;Beginning the daily ETL process...&quot;)
+
+# Define the DAG context
+with DAG(
+    dag_id=&quot;daily_system_etl&quot;,
+    default_args=default_args,
+    description=&quot;Inbound logs extraction and cleanup&quot;,
+    schedule_interval=&quot;@daily&quot;,  # Every day at midnight
+    start_date=datetime(2026, 7, 1),
+    catchup=False,  # If True, Airflow runs missing runs since start_date
+) as dag:
+
+    # Task 1: Python Task
+    task_hello = PythonOperator(
+        task_id=&quot;log_start&quot;,
+        python_callable=print_hello
+    )
+
+    # Task 2: Bash Task
+    task_extract = BashOperator(
+        task_id=&quot;extract_raw_logs&quot;,
+        bash_command=&quot;curl -s http://api.metrics.com/logs &gt; /tmp/raw_logs.json&quot;
+    )
+
+    # Task 3: Another Bash Task
+    task_verify = BashOperator(
+        task_id=&quot;verify_s3_upload&quot;,
+        bash_command=&quot;echo &#39;Upload verified!&#39;&quot;
+    )
+
+    # Setting task execution order using bitshift operators
+    task_hello &gt;&gt; task_extract &gt;&gt; task_verify
+</code></pre>
+<hr>
+<h1 id="modern-airflow-the-taskflow-api">Modern Airflow: The TaskFlow API</h1><p>Airflow 2.0 introduced the <strong>TaskFlow API</strong>. Instead of writing verbose Operator configurations and manually using XComs, you can use the <code>@dag</code> and <code>@task</code> decorators. Airflow automatically serializes outputs and inputs between tasks.</p>
+<pre><code class="language-python">from airflow.decorators import dag, task
+from datetime import datetime
+
+@dag(
+    start_date=datetime(2026, 7, 1),
+    schedule=&quot;@daily&quot;,
+    catchup=False,
+    tags=[&quot;sales&quot;]
+)
+def simple_sales_pipeline():
+
+    @task
+    def extract_revenue():
+        # Returns a dict. Airflow saves this output to XComs
+        return {&quot;store_a&quot;: 12000, &quot;store_b&quot;: 18000}
+
+    @task
+    def calculate_total(revenues: dict) -&gt; int:
+        # Airflow automatically resolves XCom dependencies and passes it here
+        total = sum(revenues.values())
+        print(f&quot;Aggregated Sales Total: &lt;!--MATH_INLINE_0--&gt;{total_revenue}) to target warehouse.&quot;)
+
+    # Setting up dependencies by passing task outputs directly
+    raw_rev = extract_revenue()
+    total = calculate_total(raw_rev)
+    load_total(total)
+
+# Instantiate DAG
+dag_instance = simple_sales_pipeline()
+</code></pre>
+<hr>
+<h1 id="scheduling-logical-date-idempotency">Scheduling, Logical Date, &amp; Idempotency</h1><h2 id="1-logical-date-execution-date">1. Logical Date (execution_date)</h2><p>In Airflow, the Logical Date represents the start of the time interval being processed, <strong>not</strong> the current calendar time.
+For a daily DAG scheduled for <code>@daily</code> on <code>2026-07-06</code>, the execution run triggers at <code>2026-07-07 00:00:00</code>, passing <code>2026-07-06</code> as the logical date template.
+This ensures you are processing data for the interval that just closed.</p>
+<h2 id="2-designing-idempotent-pipelines">2. Designing Idempotent Pipelines</h2><p>An <strong>idempotent</strong> task produces the same result no matter how many times you run it with the same parameters.
+If a task appends transactions to a database table without deduplication, running a failed pipeline again will insert duplicate records.</p>
+<h3 id="idempotency-best-practices">Idempotency Best Practices:</h3><ol>
+<li><strong>Use UPSERTs or Write-Replace patterns:</strong> Instead of using simple <code>INSERT</code> statements, use <code>INSERT ON CONFLICT DO UPDATE</code> or overwrite target paths using partition paths (e.g. <code>/year=2026/month=07/day=06/</code>).</li>
+<li><strong>Utilize Logical Dates in Queries:</strong> Use Airflow&#39;s built-in date templates to filter data, avoiding queries that pull relative dates like <code>CURRENT_DATE</code>.</li>
+</ol>
+<pre><code class="language-python"># Idempotent database write pattern inside a task
+@task
+def load_data_to_postgres(ds=None):  # &#39;ds&#39; is Airflow&#39;s execution date string (YYYY-MM-DD)
+    query = f&quot;&quot;&quot;
+        DELETE FROM daily_metrics WHERE run_date = &#39;{ds}&#39;;
+        INSERT INTO daily_metrics (run_date, metric_value) 
+        SELECT &#39;{ds}&#39;, SUM(amount) FROM raw_transactions WHERE tx_date = &#39;{ds}&#39;;
+    &quot;&quot;&quot;
+    print(f&quot;Executing idempotent query for partition: {ds}&quot;)
+</code></pre>
+<hr>
+<h1 id="managing-connections-variables">Managing Connections &amp; Variables</h1><p>Do <strong>not</strong> hardcode database passwords or AWS secret keys inside your DAG files.
+Instead, manage secrets using Airflow&#39;s built-in <strong>Connections</strong> and <strong>Variables</strong> UI.</p>
+<pre><code class="language-python">from airflow.models import Variable
+from airflow.providers.postgres.hooks.postgres import PostgresHook
+
+@task
+def extract_from_db():
+    # Retrieve non-sensitive global variable
+    source_table = Variable.get(&quot;my_source_table&quot;, default_var=&quot;transactions&quot;)
+    
+    # Retrieve sensitive connection details using a Hook
+    pg_hook = PostgresHook(postgres_conn_id=&quot;my_production_postgres&quot;)
+    connection = pg_hook.get_conn()
+    
+    cursor = connection.cursor()
+    cursor.execute(f&quot;SELECT * FROM {source_table} LIMIT 10;&quot;)
+    records = cursor.fetchall()
+    return records
+</code></pre>
+<hr>
+<h1 id="exercises-quiz">Exercises &amp; Quiz</h1><h3 id="question-1">Question 1</h3><p>Which Airflow Executor spins up individual Kubernetes pods on-the-fly to execute each task?</p>
+<ul>
+<li>A) Local Executor.</li>
+<li>B) Celery Executor.</li>
+<li>C) Sequential Executor.</li>
+<li>D) Kubernetes Executor.</li>
+</ul>
+<p><em>Answer:</em> <strong>D</strong>. The Kubernetes Executor creates dynamic pods for each task instance, ensuring isolated environment dependencies and resource scaling.</p>
+<h3 id="question-2">Question 2</h3><p>Under which Trigger Rule will a downstream task execute if at least one of its parent tasks fails?</p>
+<ul>
+<li>A) <code>all_success</code></li>
+<li>B) <code>all_done</code></li>
+<li>C) <code>one_failed</code></li>
+<li>D) <code>none_failed</code></li>
+</ul>
+<p><em>Answer:</em> <strong>C</strong>. The <code>one_failed</code> rule is used to trigger error-handling or alert workflows when a parent task fails.</p>
+<hr>
+<h1 id="chapter-summary-checklist">Chapter Summary Checklist</h1><ul>
+<li>Can you describe the scaling differences between Celery and Kubernetes Executors?</li>
+<li>How do you construct a dynamic pipeline using <code>BranchPythonOperator</code>?</li>
+<li>When would you change a task&#39;s Trigger Rule from <code>all_success</code> to <code>all_done</code>?</li>
+<li>How do you secure database passwords using Airflow&#39;s metadata connections database?</li>
+</ul>
+
+    </article>
+    
+    
+    <div class="subpage-complete-area">
+      <div class="subpage-complete-text">Finished reading this chapter? Mark it as complete to track your progress!</div>
+      <div class="checkbox-btn-wrapper">
+        <button class="theme-toggle-btn" id="subpage-complete-btn" onclick="toggleSubpageCompletion('ch-46')">
+          <span id="complete-status-icon">⏳</span>
+          <span id="complete-status-text">Mark as Complete</span>
+        </button>
+      </div>
+    </div>
+  
+    <div class="page-nav-footer">
+        <a href="05-Distributed-Computing-PySpark.html" class="nav-footer-btn prev">
+          <span class="nav-footer-label">← Previous Chapter</span>
+          <span class="nav-footer-title">Distributed Data Processing with PySpark</span>
+        </a>
+      
+        <a href="07-End-to-End-ETL-Pipeline.html" class="nav-footer-btn next">
+          <span class="nav-footer-label">Next Chapter →</span>
+          <span class="nav-footer-title">Practical End-to-End ETL Pipeline Project</span>
+        </a>
+      </div>
+  </main>
+
+  <!-- KaTeX & Prism Scripts -->
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js" onload="initKaTeX()"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-core.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+  <script>
+    const pageId = 'ch-46';
+    let currentTheme = localStorage.getItem('theme') || 'dark';
+    
+    // Auto KaTeX setup
+    function initKaTeX() {
+      if (window.renderMathInElement) {
+        window.renderMathInElement(document.body, {
+          delimiters: [
+            {left: '$$', right: '$$', display: true},
+            {left: '\(', right: '\)', display: false},
+            {left: '$', right: '$', display: false}
+          ],
+          throwOnError : false
+        });
+      }
+    }
+
+    // Set Theme Toggler Content
+    const themeBtn = document.getElementById('theme-btn');
+    function updateThemeUI() {
+      themeBtn.innerHTML = currentTheme === 'dark' ? '🌙 Dark Mode' : '☀️ Light Mode';
+      const prismStyle = document.getElementById('prism-theme');
+      if (prismStyle) {
+        if (currentTheme === 'light') {
+          prismStyle.href = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css';
+        } else {
+          prismStyle.href = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css';
+        }
+      }
+    }
+    
+    themeBtn.addEventListener('click', () => {
+      currentTheme = currentTheme === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', currentTheme);
+      localStorage.setItem('theme', currentTheme);
+      updateThemeUI();
+    });
+    
+    updateThemeUI(); // Run immediately on load
+
+    // Copy action for code listings
+    function setupCodeBlocks() {
+      const codeBlocks = document.querySelectorAll('pre');
+      codeBlocks.forEach(block => {
+        const btn = document.createElement('button');
+        btn.className = 'copy-btn';
+        btn.innerText = 'Copy';
+        btn.onclick = () => {
+          const code = block.querySelector('code').innerText;
+          navigator.clipboard.writeText(code).then(() => {
+            btn.innerText = 'Copied!';
+            setTimeout(() => { btn.innerText = 'Copy'; }, 2000);
+          });
+        };
+        block.appendChild(btn);
+      });
+    }
+    setupCodeBlocks();
+
+    // Completion Status handling
+    function updateCompletionUI() {
+      const compBtn = document.getElementById('subpage-complete-btn');
+      if (!compBtn) return;
+      
+      const completed = JSON.parse(localStorage.getItem('completed_python_chapters') || '[]');
+      const isDone = completed.includes(pageId);
+      
+      const iconSpan = document.getElementById('complete-status-icon');
+      const textSpan = document.getElementById('complete-status-text');
+      
+      if (isDone) {
+        compBtn.style.backgroundColor = 'rgba(16, 185, 129, 0.15)';
+        compBtn.style.borderColor = '#10b981';
+        compBtn.style.color = '#10b981';
+        iconSpan.innerText = '✅';
+        textSpan.innerText = 'Completed';
+      } else {
+        compBtn.style.backgroundColor = 'var(--bg-primary)';
+        compBtn.style.borderColor = 'var(--border-color)';
+        compBtn.style.color = 'var(--text-primary)';
+        iconSpan.innerText = '⏳';
+        textSpan.innerText = 'Mark as Complete';
+      }
+    }
+
+    function toggleSubpageCompletion() {
+      let completed = JSON.parse(localStorage.getItem('completed_python_chapters') || '[]');
+      if (completed.includes(pageId)) {
+        completed = completed.filter(id => id !== pageId);
+      } else {
+        completed.push(pageId);
+      }
+      localStorage.setItem('completed_python_chapters', JSON.stringify(completed));
+      updateCompletionUI();
+    }
+    
+    updateCompletionUI();
+  </script>
+</body>
+</html>

@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Object-Oriented Programming in Data Engineering - SQL & Python Curriculum</title>
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  
+  <!-- KaTeX Math CSS -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+  
+  <!-- Prism.js Dark/Light CSS -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" id="prism-theme">
+  
+  <!-- Shared Style Sheet -->
+  <link rel="stylesheet" href="../../style.css">
+  
+  <script>
+    // Immediate script to prevent theme flash
+    (function() {
+      const theme = localStorage.getItem('theme') || 'dark';
+      document.documentElement.setAttribute('data-theme', theme);
+    })();
+  </script>
+</head>
+<body>
+  
+  <header class="site-header">
+    <div class="header-container">
+      <a href="../../index.html" class="back-link">← Back to Curriculum Directory</a>
+      <div class="header-actions">
+        <button class="theme-toggle-btn" id="theme-btn">🌙 Dark Mode</button>
+      </div>
+    </div>
+  </header>
+  
+  <main class="content-wrapper">
+    <article class="markdown-body">
+      <h1 id="chapter-3-object-oriented-programming-oop-in-data-engineering">Chapter 3: Object-Oriented Programming (OOP) in Data Engineering</h1><blockquote>
+<p><strong>Part:</strong> Python for Data Engineering</p>
+<p><strong>Chapter:</strong> 3</p>
+<p><strong>Difficulty:</strong> 🟡 Intermediate</p>
+<p><strong>Estimated Reading Time:</strong> 45–55 minutes</p>
+<p><strong>Prerequisites:</strong> Chapter 1 &amp; 2</p>
+<p><strong>Target Audience:</strong> Data Engineers, ETL Architecture Developers</p>
+<p><strong>Version:</strong> 2.0</p>
+<p><strong>Last Updated:</strong> 2026-07-06</p>
+</blockquote>
+<hr>
+<h1 id="learning-objectives">Learning Objectives</h1><p>After completing this chapter, you will be able to:</p>
+<ul>
+<li>Build class structures to wrap ETL steps and configuration parameters.</li>
+<li>Differentiate between and implement instance, class, and static methods.</li>
+<li>Apply inheritance, polymorphism, encapsulation, and abstraction to write clean, reusable extraction frameworks.</li>
+<li>Resolve multiple inheritance hierarchies using the <strong>Method Resolution Order (MRO)</strong> protocol and <code>super()</code>.</li>
+<li>Standardize record validation using <strong><code>dataclasses</code></strong>, enforcing immutability (<code>frozen=True</code>) and saving memory via <strong><code>__slots__</code></strong>.</li>
+<li>Implement design patterns in Data Engineering, specifically the <strong>Singleton</strong> pattern (connection pools) and the <strong>Factory</strong> pattern (dynamic DB clients).</li>
+<li>Construct context managers (<code>__enter__</code> / <code>__exit__</code>) to secure database connection sessions.</li>
+</ul>
+<hr>
+<h1 id="quick-revision">Quick Revision</h1><ul>
+<li><strong>Class vs. Object:</strong> A Class is a template/blueprint. An Object is an instance of that class containing state.</li>
+<li><strong><code>self</code>:</strong> Represents the specific instance of the class being operated on.</li>
+<li><strong>Method Resolution Order (MRO):</strong> The linear search path Python uses to look up attributes and methods in multiple inheritance structures (checked via <code>Class.mro()</code>).</li>
+<li><strong><code>dataclass</code>:</strong> A class decorator that automatically generates standard methods like <code>__init__</code>, <code>__repr__</code>, and <code>__eq__</code>.</li>
+<li><strong><code>__slots__</code>:</strong> A list of strings defining allowed attributes, saving memory by preventing the creation of the default <code>__dict__</code> dictionary for class instances.</li>
+<li><strong>Singleton Pattern:</strong> Restricts class instantiations to a single, global object instance.</li>
+<li><strong>Factory Pattern:</strong> Exposes a unified interface to instantiate objects on-the-fly depending on parameters.</li>
+</ul>
+<hr>
+<h1 id="class-design-method-categories">Class Design &amp; Method Categories</h1><p>In data engineering, we use classes to package database clients, file readers, and ETL job metrics.</p>
+<h3 id="instance-vs-class-vs-static-methods">Instance vs. Class vs. Static Methods</h3><ol>
+<li><strong>Instance Method:</strong> Modifies/reads an object&#39;s instance state. First parameter is <code>self</code>.</li>
+<li><strong>Class Method (<code>@classmethod</code>):</strong> Accesses/modifies class-level attributes, or serves as a constructor factory. First parameter is <code>cls</code>.</li>
+<li><strong>Static Method (<code>@staticmethod</code>):</strong> Utility functions that have no state access but logically belong inside the namespace of the class.</li>
+</ol>
+<pre><code class="language-python">import json
+
+class DatabaseConnector:
+    # Class Variable (shared across instances)
+    default_port = 5432
+
+    def __init__(self, host, username, password, port=None):
+        # Instance Variables
+        self.host = host
+        self.username = username
+        self.password = password
+        self.port = port or DatabaseConnector.default_port
+        self.connection_status = &quot;DISCONNECTED&quot;
+
+    # Instance Method
+    def connect(self):
+        self.connection_status = &quot;CONNECTED&quot;
+        print(f&quot;Connected to {self.host}:{self.port} as {self.username}&quot;)
+
+    # Class Method (Factory Constructor)
+    @classmethod
+    def from_json_config(cls, file_path):
+        with open(file_path, &quot;r&quot;) as f:
+            cfg = json.load(f)
+        # Returns a new instance using the class constructor
+        return cls(host=cfg[&quot;host&quot;], username=cfg[&quot;user&quot;], password=cfg[&quot;pass&quot;], port=cfg.get(&quot;port&quot;))
+
+    # Static Method (Helper)
+    @staticmethod
+    def is_valid_host(host):
+        return isinstance(host, str) and len(host.split(&quot;.&quot;)) == 4
+</code></pre>
+<hr>
+<h1 id="multiple-inheritance-method-resolution-order-mro">Multiple Inheritance &amp; Method Resolution Order (MRO)</h1><p>Python supports multiple inheritance, allowing a class to inherit from multiple parent classes.</p>
+<h3 id="the-diamond-problem-mro">The Diamond Problem &amp; MRO</h3><p>If a child inherits from parent classes <code>B</code> and <code>C</code>, which both inherit from a root class <code>A</code>, which method does the child run?
+Python resolves this using the <strong>C3 Linearization</strong> algorithm to determine the Method Resolution Order (MRO).</p>
+<pre><code class="language-python">class BaseConnector:
+    def connect(self):
+        print(&quot;BaseConnector: Initializing connection...&quot;)
+
+class PostgreSQLConnector(BaseConnector):
+    def connect(self):
+        print(&quot;PostgreSQLConnector: Connecting to DB...&quot;)
+        super().connect()  # Calls next method in MRO chain
+
+class AuditLogger:
+    def connect(self):
+        print(&quot;AuditLogger: Logging connection attempt...&quot;)
+        # Since AuditLogger doesn&#39;t inherit from BaseConnector,
+        # super() inside cooperative multiple inheritance looks up next in MRO
+
+# Child class inheriting from multiple classes
+class AuditedPostgresClient(PostgreSQLConnector, AuditLogger):
+    pass
+
+client = AuditedPostgresClient()
+client.connect()
+
+# View lookup order
+print(AuditedPostgresClient.__mro__)
+</code></pre>
+<p><em>Output order:</em></p>
+<ol>
+<li><code>AuditedPostgresClient</code></li>
+<li><code>PostgreSQLConnector</code></li>
+<li><code>AuditLogger</code> (cooperative search resolves this next!)</li>
+<li><code>BaseConnector</code></li>
+<li><code>object</code></li>
+</ol>
+<hr>
+<h1 id="modern-data-structures-dataclasses">Modern Data Structures: Dataclasses</h1><p>Writing boilerplate code for data representation classes is tedious. Python&#39;s <code>@dataclass</code> decorator automates method generation.</p>
+<h3 id="dataclass-features"><code>@dataclass</code> Features:</h3><ul>
+<li>Implements <code>__init__</code>, <code>__repr__</code>, <code>__eq__</code> automatically.</li>
+<li><strong><code>frozen=True</code></strong>: Enforces immutability, making records read-only and hashable (allowing insertion into sets or dict keys).</li>
+<li><strong><code>__slots__</code></strong>: Restricts dynamic attribute creation. By default, every class instance holds a dictionary (<code>__dict__</code>) to store attributes. Using <code>__slots__</code> bypasses <code>__dict__</code>, reducing the object&#39;s memory overhead by up to 60%.</li>
+</ul>
+<pre><code class="language-python">from dataclasses import dataclass
+
+# Dataclass with slots and frozen validation
+@dataclass(frozen=True, slots=True)
+class LogRecord:
+    timestamp: str
+    user_id: int
+    event_type: str
+    ip_address: str
+
+# Instantiate record
+record = LogRecord(&quot;2026-07-06 12:00:00&quot;, 9122, &quot;LOGIN&quot;, &quot;10.0.0.1&quot;)
+
+# Attempting to modify attributes raises frozen exception:
+# record.user_id = 9999  # FrozenInstanceError
+</code></pre>
+<hr>
+<h1 id="design-patterns-in-data-engineering">Design Patterns in Data Engineering</h1><p>OOP allows us to structure common creational patterns to manage configuration and connections.</p>
+<h2 id="1-the-singleton-pattern">1. The Singleton Pattern</h2><p>When connecting to a database, you should avoid instantiating duplicate client connections. The Singleton pattern guarantees that only one instance of the class exists.</p>
+<pre><code class="language-python">class DatabaseConnectionPool:
+    _instance = None
+
+    def __new__(cls, *args, **kwargs):
+        if not cls._instance:
+            print(&quot;Creating global database connection pool...&quot;)
+            cls._instance = super(DatabaseConnectionPool, cls).__new__(cls)
+        return cls._instance
+
+    def __init__(self, size=10):
+        # Prevent re-initializing instance variables if pool already exists
+        if not hasattr(self, &quot;initialized&quot;):
+            self.size = size
+            self.initialized = True
+            self.connections = [&quot;conn_1&quot;, &quot;conn_2&quot;]
+</code></pre>
+<h2 id="2-the-factory-pattern">2. The Factory Pattern</h2><p>In ingestion pipelines, you need to instantiate different extractor classes depending on the file format. The Factory pattern delegates the instantiation logic to a central creator function.</p>
+<pre><code class="language-python">class BaseReader:
+    def read(self): raise NotImplementedError
+
+class CSVReader(BaseReader):
+    def read(self): return &quot;Reading CSV file...&quot;
+
+class ParquetReader(BaseReader):
+    def read(self): return &quot;Reading Parquet file...&quot;
+
+# Ingestion Factory
+class IngestionReaderFactory:
+    @staticmethod
+    def get_reader(file_format: str) -&gt; BaseReader:
+        formats = {
+            &quot;csv&quot;: CSVReader,
+            &quot;parquet&quot;: ParquetReader
+        }
+        reader_class = formats.get(file_format.lower())
+        if not reader_class:
+            raise ValueError(f&quot;Unsupported ingestion format: {file_format}&quot;)
+        return reader_class()
+
+# Usage
+reader = IngestionReaderFactory.get_reader(&quot;parquet&quot;)
+print(reader.read())  # &quot;Reading Parquet file...&quot;
+</code></pre>
+<hr>
+<h1 id="the-four-pillars-of-oop-in-data-engineering">The Four Pillars of OOP in Data Engineering</h1><h2 id="1-inheritance">1. Inheritance</h2><p>Inheritance allows a class to inherit attributes and methods from a parent class. This is perfect for setting up a generic base extractor class and writing database-specific subclasses.</p>
+<pre><code class="language-python">class BaseExtractor:
+    def __init__(self, source_path):
+        self.source_path = source_path
+        print(f&quot;Initialized extractor for: {self.source_path}&quot;)
+
+    def log_progress(self, message):
+        print(f&quot;[EXTRACTOR LOG]: {message}&quot;)
+
+# Child class inheriting from BaseExtractor
+class S3Extractor(BaseExtractor):
+    def download_file(self):
+        self.log_progress(&quot;Connecting to AWS S3...&quot;)
+        # Download logic here
+        self.log_progress(f&quot;File downloaded from S3 path: {self.source_path}&quot;)
+</code></pre>
+<h2 id="2-polymorphism">2. Polymorphism</h2><p>Polymorphism allows subclasses to define their own specific behaviors for a shared method interface. A controller script can iterate over multiple extractors and trigger them identically.</p>
+<pre><code class="language-python">class CSVReader:
+    def parse(self):
+        return &quot;Parsing CSV lines into list of dicts...&quot;
+
+class ParquetReader:
+    def parse(self):
+        return &quot;Reading Parquet columns into binary format...&quot;
+
+# Client code executing polymorphic calls
+readers = [CSVReader(), ParquetReader()]
+for reader in readers:
+    # Polymorphism: calls parse() without needing to know the specific class type
+    print(reader.parse())
+</code></pre>
+<h2 id="3-encapsulation">3. Encapsulation</h2><p>Encapsulation wraps data and methods in a single unit and restricts direct access to prevent state corruption.</p>
+<ul>
+<li>Single underscore <code>_</code>: Protected variable (by convention, do not access outside the class).</li>
+<li>Double underscore <code>__</code>: Private variable (enforces name mangling to prevent direct modification).</li>
+<li>Properties (<code>@property</code>): Used to control access and validate variables when reading or writing them.</li>
+</ul>
+<pre><code class="language-python">class APIClient:
+    def __init__(self, endpoint, rate_limit):
+        self.endpoint = endpoint
+        self.__rate_limit = rate_limit  # Private attribute
+
+    # Getter property
+    @property
+    def rate_limit(self):
+        return self.__rate_limit
+
+    # Setter property with validation logic
+    @rate_limit.setter
+    def rate_limit(self, value):
+        if value &lt;= 0:
+            raise ValueError(&quot;Rate limit must be greater than zero requests/sec.&quot;)
+        self.__rate_limit = value
+</code></pre>
+<h2 id="4-abstraction">4. Abstraction</h2><p>Abstraction hides implementation details and exposes only essential features. Python uses the <code>abc</code> (Abstract Base Class) module. If a subclass fails to implement an abstract method, Python will raise a <code>TypeError</code> when you try to instantiate it.</p>
+<pre><code class="language-python">from abc import ABC, abstractmethod
+
+class DataPipeline(ABC):
+    @abstractmethod
+    def extract(self):
+        pass
+
+    @abstractmethod
+    def transform(self, data):
+        pass
+
+    @abstractmethod
+    def load(self, data):
+        pass
+
+    # Concrete method (shared logic)
+    def run_pipeline(self):
+        raw_data = self.extract()
+        clean_data = self.transform(raw_data)
+        self.load(clean_data)
+
+class DailyUserETL(DataPipeline):
+    def extract(self):
+        return [&quot;Raw User Data&quot;]
+    
+    def transform(self, data):
+        return [item.lower() for item in data]
+    
+    def load(self, data):
+        print(f&quot;Loaded users to S3: {data}&quot;)
+</code></pre>
+<hr>
+<h1 id="magic-methods-context-managers">Magic Methods &amp; Context Managers</h1><p>Magic methods are prefixed and suffixed with double underscores <code>__</code>. They customize core behaviors.</p>
+<h3 id="context-managers-enter-exit-">Context Managers (<code>__enter__</code> &amp; <code>__exit__</code>)</h3><p>One of the most important concepts for a Data Engineer is managing resources. If an ETL job exits due to a database exception without closing its connections, the database server can exhaust its connection pool and crash.
+Context managers guarantee cleanup, even if exceptions occur.</p>
+<p>Let&#39;s write a safe custom Postgres cursor context manager:</p>
+<pre><code class="language-python">import psycopg2
+
+class PostgresConnectionManager:
+    def __init__(self, dsn):
+        self.dsn = dsn
+        self.connection = None
+
+    def __enter__(self):
+        # Setup resource
+        print(&quot;Opening PostgreSQL database connection...&quot;)
+        self.connection = psycopg2.connect(self.dsn)
+        return self.connection.cursor()  # Yields the cursor to the with-statement
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        # Teardown resource
+        print(&quot;Closing PostgreSQL database connection...&quot;)
+        if self.connection:
+            if exc_type is not None:
+                # An exception occurred, roll back any changes
+                print(f&quot;Exception encountered: {exc_val}. Rolling back transaction...&quot;)
+                self.connection.rollback()
+            else:
+                # Success, commit transaction
+                self.connection.commit()
+            self.connection.close()
+        
+        # Return True to suppress exceptions (usually not recommended), False to propagate them
+        return False
+</code></pre>
+<p>Usage:</p>
+<pre><code class="language-python">db_dsn = &quot;dbname=lake user=admin password=secret host=localhost&quot;
+
+# The connection and cursor are automatically cleaned up even if queries crash
+try:
+    with PostgresConnectionManager(db_dsn) as cursor:
+        cursor.execute(&quot;SELECT * FROM non_existent_table;&quot;)
+        results = cursor.fetchall()
+except Exception as e:
+    print(f&quot;Handled error: {e}&quot;)
+</code></pre>
+<hr>
+<h1 id="exercises-quiz">Exercises &amp; Quiz</h1><h3 id="question-1">Question 1</h3><p>What does cooperative multiple inheritance look like in Python?</p>
+<ul>
+<li>A) Running loops inside thread pools.</li>
+<li>B) Ensuring that subclasses call <code>super()</code> inside overriding methods to yield control back to the MRO lookup chain.</li>
+<li>C) Making all class attributes public.</li>
+<li>D) Running Spark submit with Python 2 support.</li>
+</ul>
+<p><em>Answer:</em> <strong>B</strong>. Cooperative inheritance requires using <code>super()</code> so Python can search all inheriting classes in the linear MRO chain.</p>
+<h3 id="question-2">Question 2</h3><p>How does adding <code>__slots__</code> to a custom class optimize RAM usage?</p>
+<ul>
+<li>A) It compiles variables into native C floats.</li>
+<li>B) It changes mutable fields to immutable ones.</li>
+<li>C) It bypasses creating the default instance dictionary <code>__dict__</code>, reducing the memory overhead of class instances.</li>
+<li>D) It deletes object references when the script finishes.</li>
+</ul>
+<p><em>Answer:</em> <strong>C</strong>. Restricting properties to a predefined list using <code>__slots__</code> prevents the creation of the default instance dictionary <code>__dict__</code>, saving memory.</p>
+<hr>
+<h1 id="chapter-summary-checklist">Chapter Summary Checklist</h1><ul>
+<li>Can you determine the MRO flow order of a multiple inheritance structure?</li>
+<li>How do you construct an immutable dataclass schema?</li>
+<li>What is the difference between Singleton and Factory design patterns?</li>
+<li>Can you write a custom context manager class to handle files safely?</li>
+</ul>
+
+    </article>
+    
+    
+    <div class="subpage-complete-area">
+      <div class="subpage-complete-text">Finished reading this chapter? Mark it as complete to track your progress!</div>
+      <div class="checkbox-btn-wrapper">
+        <button class="theme-toggle-btn" id="subpage-complete-btn" onclick="toggleSubpageCompletion('ch-43')">
+          <span id="complete-status-icon">⏳</span>
+          <span id="complete-status-text">Mark as Complete</span>
+        </button>
+      </div>
+    </div>
+  
+    <div class="page-nav-footer">
+        <a href="02-Control-Flow-and-Functions.html" class="nav-footer-btn prev">
+          <span class="nav-footer-label">← Previous Chapter</span>
+          <span class="nav-footer-title">Control Flow, Comprehensions & Functions</span>
+        </a>
+      
+        <a href="04-Data-Manipulation-NumPy-and-Pandas.html" class="nav-footer-btn next">
+          <span class="nav-footer-label">Next Chapter →</span>
+          <span class="nav-footer-title">Data Wrangling with NumPy & Pandas</span>
+        </a>
+      </div>
+  </main>
+
+  <!-- KaTeX & Prism Scripts -->
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js" onload="initKaTeX()"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-core.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+  <script>
+    const pageId = 'ch-43';
+    let currentTheme = localStorage.getItem('theme') || 'dark';
+    
+    // Auto KaTeX setup
+    function initKaTeX() {
+      if (window.renderMathInElement) {
+        window.renderMathInElement(document.body, {
+          delimiters: [
+            {left: '$$', right: '$$', display: true},
+            {left: '\(', right: '\)', display: false},
+            {left: '$', right: '$', display: false}
+          ],
+          throwOnError : false
+        });
+      }
+    }
+
+    // Set Theme Toggler Content
+    const themeBtn = document.getElementById('theme-btn');
+    function updateThemeUI() {
+      themeBtn.innerHTML = currentTheme === 'dark' ? '🌙 Dark Mode' : '☀️ Light Mode';
+      const prismStyle = document.getElementById('prism-theme');
+      if (prismStyle) {
+        if (currentTheme === 'light') {
+          prismStyle.href = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css';
+        } else {
+          prismStyle.href = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css';
+        }
+      }
+    }
+    
+    themeBtn.addEventListener('click', () => {
+      currentTheme = currentTheme === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', currentTheme);
+      localStorage.setItem('theme', currentTheme);
+      updateThemeUI();
+    });
+    
+    updateThemeUI(); // Run immediately on load
+
+    // Copy action for code listings
+    function setupCodeBlocks() {
+      const codeBlocks = document.querySelectorAll('pre');
+      codeBlocks.forEach(block => {
+        const btn = document.createElement('button');
+        btn.className = 'copy-btn';
+        btn.innerText = 'Copy';
+        btn.onclick = () => {
+          const code = block.querySelector('code').innerText;
+          navigator.clipboard.writeText(code).then(() => {
+            btn.innerText = 'Copied!';
+            setTimeout(() => { btn.innerText = 'Copy'; }, 2000);
+          });
+        };
+        block.appendChild(btn);
+      });
+    }
+    setupCodeBlocks();
+
+    // Completion Status handling
+    function updateCompletionUI() {
+      const compBtn = document.getElementById('subpage-complete-btn');
+      if (!compBtn) return;
+      
+      const completed = JSON.parse(localStorage.getItem('completed_python_chapters') || '[]');
+      const isDone = completed.includes(pageId);
+      
+      const iconSpan = document.getElementById('complete-status-icon');
+      const textSpan = document.getElementById('complete-status-text');
+      
+      if (isDone) {
+        compBtn.style.backgroundColor = 'rgba(16, 185, 129, 0.15)';
+        compBtn.style.borderColor = '#10b981';
+        compBtn.style.color = '#10b981';
+        iconSpan.innerText = '✅';
+        textSpan.innerText = 'Completed';
+      } else {
+        compBtn.style.backgroundColor = 'var(--bg-primary)';
+        compBtn.style.borderColor = 'var(--border-color)';
+        compBtn.style.color = 'var(--text-primary)';
+        iconSpan.innerText = '⏳';
+        textSpan.innerText = 'Mark as Complete';
+      }
+    }
+
+    function toggleSubpageCompletion() {
+      let completed = JSON.parse(localStorage.getItem('completed_python_chapters') || '[]');
+      if (completed.includes(pageId)) {
+        completed = completed.filter(id => id !== pageId);
+      } else {
+        completed.push(pageId);
+      }
+      localStorage.setItem('completed_python_chapters', JSON.stringify(completed));
+      updateCompletionUI();
+    }
+    
+    updateCompletionUI();
+  </script>
+</body>
+</html>
